@@ -2,7 +2,7 @@ _base_ = [
     '../_base_/models/distill.py',
     '../_base_/datasets/ade20k.py',
     '../_base_/default_runtime.py',
-    '../_base_/schedules/schedule_20k.py'
+    '../_base_/schedules/schedule_40k.py'
 ]
 log_config = dict(  
     interval=50, 
@@ -10,7 +10,7 @@ log_config = dict(
         dict(type='TensorboardLoggerHook') 
         # dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/logits_20k'
+work_dir = './work_dirs/logits'
 
 model = dict(
         distillation = dict(

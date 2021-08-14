@@ -113,9 +113,10 @@ data
 *.log.json
 work_dirs/
 work_dirs
-pretrained
-pretrained/
+# pretrained
+# pretrained/
 # Pytorch
-*.pth
+# *.pth
+data
 trash/
 trash
