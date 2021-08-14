@@ -46,3 +46,12 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')
+
+
+work_dir = './test/test1'
+log_config = dict(  
+    interval=50, 
+    hooks=[
+        # dict(type='TensorboardLoggerHook') 
+        dict(type='TextLoggerHook')
+    ])

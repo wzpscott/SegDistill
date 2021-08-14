@@ -61,6 +61,7 @@ def single_gpu_test(model,
             result = model(return_loss=False, **data)
 
         if show or out_dir:
+            
             img_tensor = data['img'][0]
             img_metas = data['img_metas'][0].data[0]
             imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
@@ -103,7 +104,7 @@ def single_gpu_test(model,
 def multi_gpu_test(model,
                    data_loader,
                    tmpdir=None,
-                   gpu_collect=False,
+                   gpu_collect=True,
                    efficient_test=False):
     """Test model with multiple gpus.
 
@@ -135,7 +136,6 @@ def multi_gpu_test(model,
     for i, data in enumerate(data_loader):
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)
-
         if isinstance(result, list):
             if efficient_test:
                 result = [np2tmp(_) for _ in result]
