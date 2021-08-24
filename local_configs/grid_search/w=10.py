@@ -2,15 +2,15 @@ _base_ = [
     '../_base_/models/distill.py',
     '../_base_/datasets/ade20k.py',
     '../_base_/default_runtime.py',
-    '../_base_/schedules/schedule_20k.py'
+    '../_base_/schedules/schedule_160k.py'
 ]
 log_config = dict(  
     interval=50, 
     hooks=[
-        dict(type='TensorboardLoggerHook') 
-        # dict(type='TextLoggerHook')
+        # dict(type='TensorboardLoggerHook') 
+        dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/selective/distill/T=1,w=1'
+work_dir = './work_dirs/w=10'
 
 model = dict(
         distillation = dict(
@@ -29,7 +29,7 @@ model = dict(
         # 3. distill_0: 去除logits层所有结果为255的pixel之后进行蒸馏
         # 4. distill_1: 去除logits层所有结果为255的pixel+teacher预测错误的pixel+student预测正确的pixel 之后进行蒸馏
         # 5. distill_2: 去除logits层所有结果为255的pixel+teacher预测错误的pixel 之后进行蒸馏
-        selective='distill',T=1,weight=1
+        selective='distill',T=1,weight=10
     ),
     s_pretrain = './pretrained/mit_b1.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth'  # 老师的预训练模型

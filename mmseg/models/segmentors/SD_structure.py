@@ -25,7 +25,11 @@ class SDModule_(BaseSegmentor):
             self.use_teacher = False
         else:
             self.use_teacher = True
-        self.selective = distillation['selective']
+        if 'selective' in distillation:
+            self.selective = distillation['selective']
+        else:
+            self.selective = 'none'
+            
         self.teacher = builder.build_segmentor(
             cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
         self.teacher.load_state_dict(torch.load(
