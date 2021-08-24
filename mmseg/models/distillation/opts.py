@@ -31,12 +31,6 @@ class Extractor(nn.Module):
                 if name == student_layer:
                     module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='student'))
                     print(f'student_layer :{student_layer} hooked!!!!')
-            # for name, module in teacher.named_modules():
-            #     print(name)
-            # print('--------------------')
-            # for name, module in student.named_modules():
-            #     print(name)
-            # raise ValueError('!!!!!!!!!!!!!!!!!!')
 
     def hook_fn_forward(self, module, input, output, name, type,layer_num=None):
         if self.training == True:
@@ -52,6 +46,7 @@ class Extractor(nn.Module):
 class ff(nn.Module):
     def __init__(self,input_size,output_size):
         super().__init__()
+
         # self.ff = nn.Sequential(
         #     nn.Conv1d(input_size,input_size, kernel_size=1, stride=1, padding=0),
         #     nn.GELU(),
@@ -80,6 +75,7 @@ class conv1d(nn.Module):
         x = self.conv(x)
         x = x.permute(0,2,1)
         return x
+
 class AttnAdaptor(nn.Module):
     def __init__(self, student_size, teacher_size, teacher_num):
         super().__init__()
@@ -95,41 +91,34 @@ class AttnAdaptor(nn.Module):
         teacher_num = len(x_teachers)
         C_s = x_student.shape[2]
         T = 1
-        x_teachers = torch.stack(x_teachers, dim=0).mean(dim=3).reshape(teacher_num,-1)  # x_teachers:[teacher_num,b*WH]
-        x_student = x_student.mean(dim=2).reshape(-1,b*WH) # [1,b*WH]
 
-        x_teachers = F.softmax(x_teachers,dim=1)
-        x_student = F.log_softmax(x_student,dim=1)
-
-        attn = self.KL(x_student.repeat(teacher_num,1),x_teachers).sum(dim=1)
-        return x_teachers.mean(),x_student.mean(),F.softmax(attn)
-        # for i in range(len(x_teachers)):
-        #     x_teachers[i] = self.Wt[i](x_teachers[i])  # x_teachers[i]:[b,WH,C_t]
+        for i in range(len(x_teachers)):
+            x_teachers[i] = self.Wt[i](x_teachers[i])  # x_teachers[i]:[b,WH,C_t]
 
         
-        # x_teachers = torch.stack(x_teachers, dim=0)  # x_teachers:[teacher_num,b,WH,C_t]
-        # x_teachers = F.normalize(x_teachers,dim=2)
-        # # print('x_teachers.shape',x_teachers.shape)
-        # x_student = self.Ws(x_student)  # x_student:[b,WH,C_t]
-        # x_student = F.normalize(x_student,dim=1)
-        # x_student = x_student.unsqueeze(0)  # x_student:[1,b,WH,C_t]
-        # # print('x_student.shape',x_student.shape)
-        # # x_student = x_student.permute(1,0,2).reshape(WH,b*C_s) # x_student:[WH,b*C_s]
-        # # x_student = F.softmax(x_student,dim=0).mean(dim=1).unsqueeze(0) # x_student:[1,WH]
-        # # x_student = x_student.mean(dim=1).unsqueeze(0) # x_student:[1,WH]
+        x_teachers = torch.stack(x_teachers, dim=0)  # x_teachers:[teacher_num,b,WH,C_t]
+        x_teachers = F.normalize(x_teachers,dim=2)
+        # print('x_teachers.shape',x_teachers.shape)
+        x_student = self.Ws(x_student)  # x_student:[b,WH,C_t]
+        x_student = F.normalize(x_student,dim=1)
+        x_student = x_student.unsqueeze(0)  # x_student:[1,b,WH,C_t]
+        # print('x_student.shape',x_student.shape)
+        # x_student = x_student.permute(1,0,2).reshape(WH,b*C_s) # x_student:[WH,b*C_s]
+        # x_student = F.softmax(x_student,dim=0).mean(dim=1).unsqueeze(0) # x_student:[1,WH]
+        # x_student = x_student.mean(dim=1).unsqueeze(0) # x_student:[1,WH]
 
-        # attn = (x_teachers * x_student).reshape(teacher_num,-1)
-        # # print(attn.shape)
-        # attn = attn.sum(dim=1)  # attn:[teacher_num]
-        # # print('attn_before',attn)
-        # attn = F.softmax(attn / T, dim=0).unsqueeze(1).unsqueeze(1).unsqueeze(1)  # attn:[teacher_num,1,1,1]
-        # # print('attn:',attn)
+        attn = (x_teachers * x_student).reshape(teacher_num,-1)
+        # print(attn.shape)
+        attn = attn.sum(dim=1)  # attn:[teacher_num]
+        # print('attn_before',attn)
+        attn = F.softmax(attn / T, dim=0).unsqueeze(1).unsqueeze(1).unsqueeze(1)  # attn:[teacher_num,1,1,1]
+        # print('attn:',attn)
 
-        # x_teacher = (attn * x_teachers).sum(dim=0) # x_teacher:[1,b,WH,C_t]
-        # # print('x_teacher.shape', x_teacher.shape)
-        # # x_student = x_student.permute(1,0,2)
-        # # print('x_teacher',x_teacher)
-        # return x_student.squeeze(0), x_teacher, attn.reshape(teacher_num)
+        x_teacher = (attn * x_teachers).sum(dim=0) # x_teacher:[1,b,WH,C_t]
+        # print('x_teacher.shape', x_teacher.shape)
+        # x_student = x_student.permute(1,0,2)
+        # print('x_teacher',x_teacher)
+        return x_student.squeeze(0), x_teacher, attn.reshape(teacher_num)
 
 class Adaptor(nn.Module):
     def __init__(self,input_size,output_size,total_dim):
@@ -149,6 +138,7 @@ class Adaptor(nn.Module):
             self.ff = ff
         elif total_dim == 4:
             self.ff = nn.Conv2d(input_size,output_size, kernel_size=1, stride=1, padding=0)
+
     def forward(self,x):
         if self.total_dim == 2:
             x = x
@@ -165,15 +155,14 @@ class Adaptor(nn.Module):
 class DistillationLoss_(nn.Module):
     def __init__(self,distillation,tau):
         super().__init__()
-        self.kd_loss = CriterionChannelAwareLoss(tau)
-        # self.kd_loss = nn.MSELoss()
+        # self.kd_loss = CriterionChannelAwareLoss(tau)
+        self.kd_loss = torch.nn.KLDivLoss()
+        self.selective = distillation['selective']
         self.adaptors = nn.ModuleList()
-
         layers = distillation['layers']
         self.use_attn = distillation['use_attn']
         for _,teacher_layers,channel_dim,dim in layers:
             student_dim,teacher_dim = channel_dim
-            # self.adaptors.append(Adaptor(student_dim,teacher_dim,total_dim))
             if self.use_attn:
                 self.adaptors.append(AttnAdaptor(student_dim,teacher_dim,len(teacher_layers)))
             else:
@@ -185,9 +174,7 @@ class DistillationLoss_(nn.Module):
         # add gradients to weight of each layer's loss
         self.strategy = distillation['weights_init_strategy']
         if self.strategy=='equal':
-            # weights = [1e8,1e7,1e6,1e4,1e3]
             weights = [0.5 for i in range(len(layers))]
-            # weights = [1,1,1,1,1,1]
             weights = nn.Parameter(torch.Tensor(weights),requires_grad=False)
             self.weights = weights
         elif self.strategy=='self_adjust':
@@ -196,39 +183,84 @@ class DistillationLoss_(nn.Module):
         else:
             raise ValueError('Wrong weights init strategy')
 
-    def forward(self, soft, pred, losses):
-        for i in range(len(pred)):
-            adaptor=self.adaptors[i]
+    def forward(self, soft, pred, losses,gt_semantic_seg=None):
+        T = 5
+        from mmseg.ops import resize
+        pred = pred[0]
+        soft = soft[0][0]
 
-            if self.use_attn:
-                pred[i],soft[i],attn = adaptor(pred[i],soft[i])
+        pred = resize(
+            input=pred,
+            size=gt_semantic_seg.shape[2:],
+            mode='bilinear',
+            align_corners=False)
+        soft = resize(
+            input=soft,
+            size=gt_semantic_seg.shape[2:],
+            mode='bilinear',
+            align_corners=False)  # [b,C,W,H]  
 
-                for j in range(attn.shape[0]):
-                    losses.update({'attn'+str(i)+'layer'+str(j): attn[j].clone()})
-            else:
-                soft[i] = soft[i][0]
-                pred[i] = adaptor(pred[i])
-
-
-            if self.strategy=='equal':
-                loss = self.weights[i]*self.kd_loss(pred[i], soft[i])
-                name = self.layers[i]
-                losses.update({'loss_'+name: loss})
-            elif self.strategy=='self_adjust':
-                loss = (1/(self.weights[0]**2))*\
-                        self.kd_loss(pred[i], soft[i])\
-                        +torch.log(self.weights[0])
-                name = self.layers[i]
-                losses.update({'loss_'+name: loss})
-                losses.update({'weight_'+name: self.weights[0]})
+        if self.selective == 'distill':
             
-             
-        if self.strategy=='equal':
-            pass
-        elif self.strategy=='self_adjust':
-            losses['decode.loss_seg'] =(1/(self.weights[1]**2))*losses['decode.loss_seg']+torch.log(self.weights[1])
-            losses['aux.loss_seg'] = (1/(self.weights[2]**2))*losses['aux.loss_seg']+torch.log(self.weights[2])
+            pred = F.softmax(pred/T,dim=1).permute(1,0,2,3)
+            soft = F.softmax(soft/T,dim=1).permute(1,0,2,3)
+            loss = self.kd_loss(pred.log(), soft)*500
+            losses.update({'loss_kd': loss})
+            return losses
+        else:
+            b, C, W, H = soft.shape
+            soft = soft.permute(1,0,2,3).reshape(C,-1) # [C,b*W*H]
+            pred = pred.permute(1,0,2,3).reshape(C,-1) # [C,b*W*H]
 
-            losses.update({'weight_'+'decode.loss_seg': self.weights[1]})
-            losses.update({'weight_'+'aux.loss_seg': self.weights[2]})
-        return losses
+            label = gt_semantic_seg.reshape(-1).unsqueeze(0) # # [1,b*W*H]
+            mask =( label!=255)
+            label = torch.masked_select(label,mask).unsqueeze(0)
+
+            bg_proportion = 1-torch.sum(mask)/(W*H*b)
+            losses.update({'255_proportion': bg_proportion})
+
+            soft = torch.masked_select(soft,mask).reshape(C,-1)
+            pred = torch.masked_select(pred,mask).reshape(C,-1)
+            del mask
+
+            pred_pd = torch.argmax(pred,dim=0)
+            soft_pd = torch.argmax(soft,dim=0)
+
+            ones = torch.eye(C).cuda()
+            mask = ones.index_select(0,label.squeeze(0)).bool().transpose(0,1)
+            del ones
+
+            student_gt = torch.masked_select(F.softmax(pred,dim=1),mask).reshape(1,-1)  # [1,b*W*H]
+            teacher_gt = torch.masked_select(F.softmax(soft,dim=1),mask).reshape(1,-1)  # [1,b*W*H]
+
+            pre1 = (teacher_gt > student_gt).bool()
+            pre2 = (student_gt < 0.5).bool()
+            pre3 = (soft_pd == label).bool()
+            pre4 = (pred_pd != label).bool()
+            if '0' in self.selective:
+                learn_mask = torch.ones(pre1.shape).bool().cuda()  # learn everything except 255
+            elif '1' in self.selective:
+                learn_mask = (pre3 & pre4).bool()  # learn only teacher is right and student is wrong
+            elif '2' in self.selective:
+                learn_mask = pre3.bool()  # learn only teacher is right
+            # elif '3' in self.selective:
+            #     learn_mask = pre1.bool()  # learn only when teacher has higher soft prob output for gt than student
+            # elif '4' in self.selective:
+            #     learn_mask = (pre1 & pre2).bool()  # learn only when teacher has higher soft prob output for gt than student
+            #                                         # and student do not have high confidence
+            else:
+                raise ValueError('wrong strategy')
+
+            learn_proportion = torch.sum(learn_mask)/(teacher_gt.shape[1])
+            losses.update({'learn_proportion': learn_proportion})
+
+            soft = torch.masked_select(soft,learn_mask).reshape(1,C,-1)
+            pred = torch.masked_select(pred,learn_mask).reshape(1,C,-1)
+
+            pred = F.softmax(pred/T,dim=1).squeeze(0).permute(1,0)
+            soft = F.softmax(soft/T,dim=1).squeeze(0).permute(1,0)
+            loss = 1000*self.kd_loss(pred.log(),soft)*learn_proportion            
+
+            losses.update({'loss_kd': loss})
+
+            return losses

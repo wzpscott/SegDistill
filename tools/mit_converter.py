@@ -7,7 +7,7 @@ import torch
 def mit_convert(ckpt):
     new_ckpt = OrderedDict()
     # Process the concat between q linear weights and kv linear weights
-    for k, v in ckpt.items():
+    for k, v in ckpt['state_dict'].items():
         if k.startswith('head'):
             continue
         # patch embedding convertion
@@ -50,7 +50,7 @@ def mit_convert(ckpt):
             new_k = k
             new_v = v
         new_ckpt[new_k] = new_v
-    
+    print(1)
     return new_ckpt
 
 
@@ -75,3 +75,5 @@ if __name__ == '__main__':
 
     ckpt = mit_convert(ckpt)
     torch.save(ckpt, dst_path)
+    for k, v in ckpt.items():
+        print(k)

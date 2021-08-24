@@ -18,7 +18,8 @@ model = dict(
         ],
         weights_init_strategy='equal',
         parse_mode='regular',
-        use_attn=False
+        use_attn=False,
+        selective=False
     ),
     s_pretrain = './pretrained/mit_b0.pth',
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',
@@ -34,3 +35,4 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=8)
 evaluation = dict(interval=2000, metric='mIoU')  
+resume_from = './work_dirs/baseline/iter_24000.pth'
