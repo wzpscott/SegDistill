@@ -4,16 +4,53 @@ _base_ = [
     '../_base_/default_runtime.py',
     '../_base_/schedules/schedule_80k.py'
 ]
+norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
     interval=50, 
     hooks=[
-        dict(type='TensorboardLoggerHook') 
-        # dict(type='TextLoggerHook')
+        # dict(type='TensorboardLoggerHook') 
+        dict(type='TextLoggerHook')
     ])
 work_dir = './work_dirs/selective/kld_4'
 
 model = dict(
-        distillation = dict(
+    cfg=dict(
+        type='EncoderDecoder',
+    backbone=dict(
+        type='mit_b1',
+        style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[64, 128, 320, 512],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=norm_cfg,
+        align_corners=False,
+        decoder_params=dict(embed_dim=256),
+        loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
+    ),
+    cfg_t=dict(
+        type='EncoderDecoder',
+        backbone=dict(
+            type='mit_b4',
+            style='pytorch'),
+        decode_head=dict(
+            type='SegFormerHead',
+            in_channels=[64, 128, 320, 512],
+            in_index=[0, 1, 2, 3],
+            feature_strides=[4, 8, 16, 32],
+            channels=128,
+            dropout_ratio=0.1,
+            num_classes=150,
+            norm_cfg=norm_cfg,
+            align_corners=False,
+            decoder_params=dict(embed_dim=768),
+            loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
+    ),
+    distillation = dict(
         layers=[
             ['decode_head.linear_pred','decode_head.linear_pred',[150,150],4]
         ],

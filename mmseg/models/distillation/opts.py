@@ -155,8 +155,8 @@ class Adaptor(nn.Module):
 class DistillationLoss_(nn.Module):
     def __init__(self,distillation,tau):
         super().__init__()
-        # self.kd_loss = CriterionChannelAwareLoss(tau)
-        self.kd_loss = torch.nn.KLDivLoss()
+        self.kd_loss = CriterionChannelAwareLoss(1)
+        # self.kd_loss = torch.nn.KLDivLoss()
         if 'T' in distillation:
             self.T = distillation['T']
         else:
@@ -184,7 +184,7 @@ class DistillationLoss_(nn.Module):
         # add gradients to weight of each layer's loss
         self.strategy = distillation['weights_init_strategy']
         if self.strategy=='equal':
-            weights = [0.5 for i in range(len(layers))]
+            weights = [1 for i in range(len(layers))]
             weights = nn.Parameter(torch.Tensor(weights),requires_grad=False)
             self.weights = weights
         elif self.strategy=='self_adjust':
@@ -204,18 +204,19 @@ class DistillationLoss_(nn.Module):
             pred = resize(
                 input=pred,
                 size=gt_semantic_seg.shape[2:],
-                mode='bicubic',
+                mode='bilinear',
                 align_corners=False)
             soft = resize(
                 input=soft,
                 size=gt_semantic_seg.shape[2:],
-                mode='bicubic',
+                mode='bilinear',
                 align_corners=False)  # [b,C,W,H]  
 
             if self.selective == 'distill':
-                pred = F.softmax(pred/T,dim=1).permute(1,0,2,3).contiguous()
-                soft = F.softmax(soft/T,dim=1).permute(1,0,2,3).contiguous()
-                loss = self.kd_loss(pred.log(), soft) * weight
+                # pred = F.softmax(pred/T,dim=1).permute(1,0,2,3).contiguous()
+                # soft = F.softmax(soft/T,dim=1).permute(1,0,2,3).contiguous()
+                # loss = self.kd_loss(pred.log(), soft) * weight
+                loss = self.kd_loss(pred, soft) * weight
                 losses.update({'loss_kd': loss})
                 return losses
             else:
@@ -268,9 +269,9 @@ class DistillationLoss_(nn.Module):
                 soft = torch.masked_select(soft,learn_mask).reshape(1,C,-1)
                 pred = torch.masked_select(pred,learn_mask).reshape(1,C,-1)
 
-                pred = F.softmax(pred/T,dim=1).squeeze(0).permute(1,0)
-                soft = F.softmax(soft/T,dim=1).squeeze(0).permute(1,0)
-                loss = weight * self.kd_loss(pred.log(),soft)*learn_proportion            
+                # pred = F.softmax(pred/T,dim=1).squeeze(0).permute(1,0)
+                # soft = F.softmax(soft/T,dim=1).squeeze(0).permute(1,0)
+                loss = weight * self.kd_loss(pred,soft)*learn_proportion            
 
                 losses.update({'loss_kd': loss})
 
