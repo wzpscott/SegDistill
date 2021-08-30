@@ -271,6 +271,8 @@ class DistillationLoss_(nn.Module):
 
                 # pred = F.softmax(pred/T,dim=1).squeeze(0).permute(1,0)
                 # soft = F.softmax(soft/T,dim=1).squeeze(0).permute(1,0)
+                if learn_proportion == 0:
+                    return losses
                 loss = weight * self.kd_loss(pred,soft)*learn_proportion            
 
                 losses.update({'loss_kd': loss})
