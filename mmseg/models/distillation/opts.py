@@ -169,6 +169,11 @@ class DistillationLoss_(nn.Module):
         print('T:', self.T)
         self.selective = distillation['selective']
         self.adaptors = nn.ModuleList()
+
+        # self.conv_t_t = nn.ConvTranspose2d(150, 150, 4, stride=4)
+        self.conv = nn.Conv2d(150,150,kernel_size=1)
+        
+
         layers = distillation['layers']
         self.use_attn = distillation['use_attn']
         for _,teacher_layers,channel_dim,dim in layers:
@@ -201,11 +206,15 @@ class DistillationLoss_(nn.Module):
             pred = pred[0]
             soft = soft[0][0]
 
+            # pred = self.conv_t_t(pred)
+            # soft = self.conv_t_s(soft)
+
             pred = resize(
                 input=pred,
                 size=gt_semantic_seg.shape[2:],
                 mode='bilinear',
                 align_corners=False)
+            pred = self.conv(pred)
             soft = resize(
                 input=soft,
                 size=gt_semantic_seg.shape[2:],
@@ -259,7 +268,10 @@ class DistillationLoss_(nn.Module):
                 #     learn_mask = pre1.bool()  # learn only when teacher has higher soft prob output for gt than student
                 # elif '4' in self.selective:
                 #     learn_mask = (pre1 & pre2).bool()  # learn only when teacher has higher soft prob output for gt than student
-                #                                         # and student do not have high confidence
+                #    
+                                                     # and student do not have high confidence
+                elif 'zero' in self.selective:
+                    learn_mask = (pre3 & ~pre3).bool()
                 else:
                     raise ValueError('wrong strategy')
 
@@ -271,7 +283,8 @@ class DistillationLoss_(nn.Module):
 
                 # pred = F.softmax(pred/T,dim=1).squeeze(0).permute(1,0)
                 # soft = F.softmax(soft/T,dim=1).squeeze(0).permute(1,0)
-                if learn_proportion == 0:
+                
+                if float(learn_proportion) == 0:
                     return losses
                 loss = weight * self.kd_loss(pred,soft)*learn_proportion            
 
