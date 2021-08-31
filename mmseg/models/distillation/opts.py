@@ -222,9 +222,6 @@ class DistillationLoss_(nn.Module):
                 align_corners=False)  # [b,C,W,H]  
 
             if self.selective == 'distill':
-                # pred = F.softmax(pred/T,dim=1).permute(1,0,2,3).contiguous()
-                # soft = F.softmax(soft/T,dim=1).permute(1,0,2,3).contiguous()
-                # loss = self.kd_loss(pred.log(), soft) * weight
                 loss = self.kd_loss(pred, soft) * weight
                 losses.update({'loss_kd': loss})
                 return losses
@@ -244,8 +241,12 @@ class DistillationLoss_(nn.Module):
                 pred = torch.masked_select(pred,mask).reshape(C,-1)
                 del mask
 
-                pred_pd = torch.argmax(pred,dim=0)
-                soft_pd = torch.argmax(soft,dim=0)
+                try:
+                    pred_pd = torch.argmax(pred,dim=0)
+                    soft_pd = torch.argmax(soft,dim=0)
+                except:
+                    losses.update({'loss_kd': torch.Tensor(0).cuda()})
+                    return losses
 
                 ones = torch.eye(C).cuda()
                 mask = ones.index_select(0,label.squeeze(0)).bool().transpose(0,1)
@@ -278,13 +279,15 @@ class DistillationLoss_(nn.Module):
                 learn_proportion = torch.sum(learn_mask)/(teacher_gt.shape[1])
                 losses.update({'learn_proportion': learn_proportion})
 
+                
+
                 soft = torch.masked_select(soft,learn_mask).reshape(1,C,-1)
                 pred = torch.masked_select(pred,learn_mask).reshape(1,C,-1)
 
                 # pred = F.softmax(pred/T,dim=1).squeeze(0).permute(1,0)
                 # soft = F.softmax(soft/T,dim=1).squeeze(0).permute(1,0)
-                
-                if float(learn_proportion) == 0:
+                if learn_proportion.item() == 0:
+                    losses.update({'loss_kd': torch.Tensor(0).cuda()})
                     return losses
                 loss = weight * self.kd_loss(pred,soft)*learn_proportion            
 
