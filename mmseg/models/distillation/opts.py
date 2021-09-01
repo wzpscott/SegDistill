@@ -207,7 +207,7 @@ class LogitsAdaptor(nn.Module):
             elif 'zero' in self.distill_strategy:
                 learn_mask = torch.zeros(pre1.shape).bool().cuda()
 
-            learn_proportion = torch.sum(learn_mask)/(x_student.shape[1]*x_student.shape[0])
+            learn_proportion = torch.sum(learn_mask)/(learn_mask.shape[1]*learn_mask.shape[0])
 
             if learn_proportion.item() == 0:
                 return x_student.reshape(C,-1),x_teacher.reshape(C,-1)
@@ -257,7 +257,7 @@ class DistillationLoss_(nn.Module):
         if self.strategy=='equal':
             # weights = [1 for i in range(len(layers))]
             if len(layers) == 1:
-                weights = 1
+                weights = [1]
             elif len(layers) == 5:
                 weights = [0.25,0.25,0.25,0.25,1]
             elif len(layers) == 9:

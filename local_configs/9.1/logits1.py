@@ -8,8 +8,8 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
     interval=50, 
     hooks=[
-        dict(type='TensorboardLoggerHook') 
-        # dict(type='TextLoggerHook')
+        # dict(type='TensorboardLoggerHook') 
+        dict(type='TextLoggerHook')
     ])
 work_dir = './work_dirs/9.1/logits1'
 
@@ -83,5 +83,5 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=2)
+data = dict(samples_per_gpu=2,num_workers=0)
 evaluation = dict(interval=2000, metric='mIoU')  
