@@ -34,8 +34,9 @@ class Extractor(nn.Module):
 
     def hook_fn_forward(self, module, input, output, name, type,layer_num=None):
         if self.training == True:
-            if 'norm' in name:
+            if 'norm' in name or 'fc' in name:
                 output = output.permute(0,2,1)
+
             if type == 'student':
                 self.student_features.append(output)
             if type == 'teacher':

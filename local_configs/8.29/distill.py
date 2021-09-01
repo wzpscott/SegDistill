@@ -8,8 +8,8 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
     interval=50, 
     hooks=[
-        dict(type='TensorboardLoggerHook') 
-        # dict(type='TextLoggerHook')
+        # dict(type='TensorboardLoggerHook') 
+        dict(type='TextLoggerHook')
     ])
 work_dir = './bs=4,20k/logits2+attn'
 

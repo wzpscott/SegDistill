@@ -8,8 +8,8 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
     interval=50, 
     hooks=[
-        dict(type='TensorboardLoggerHook') 
-        # dict(type='TextLoggerHook')
+        # dict(type='TensorboardLoggerHook') 
+        dict(type='TextLoggerHook')
     ])
 work_dir = './work_dirs/9.1/logits+attn+mlp'
 
@@ -57,7 +57,7 @@ model = dict(
             ['backbone.block1.1.norm2','backbone.block1.2.norm2',[64,64],3],
             ['backbone.block1.1.mlp.fc2','backbone.block1.2.mlp.fc2',[64,64],3],
             ['backbone.block2.1.norm2','backbone.block2.2.norm2',[128,128],3],
-            ['backbone.block2.1.mlp.fc2','backbone.block2.7.mlp.fc2',[128,128],3],
+            ['backbone.block2.1.mlp.fc2','backbone.block2.2.mlp.fc2',[128,128],3],
             ['backbone.block3.1.norm2','backbone.block3.17.norm2',[320,320],3],
             ['backbone.block3.1.mlp.fc2','backbone.block3.17.mlp.fc2',[320,320],3],
             ['backbone.block4.1.norm2','backbone.block4.2.norm2',[512,512],3],

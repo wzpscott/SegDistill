@@ -63,7 +63,7 @@ class SDModule_(BaseSegmentor):
             soft = self.features.teacher_features[i]
             softs_fea.append(soft)
             preds_fea.append(pred)
-
+            
         if self.selective != 'none':
             loss_dict = self.loss(softs_fea, preds_fea, loss_dict,gt_semantic_seg)
         else:
