@@ -612,37 +612,51 @@ class CriterionChannelAwareLoss(nn.Module):
     def __init__(self, tau=1.0):
         super(CriterionChannelAwareLoss, self).__init__()
         self.tau = tau
+        self.KL = torch.nn.KLDivLoss(reduction='sum')
 
     def forward(self, preds, soft):
         preds_S, preds_T = preds, soft
         assert preds_S.shape == preds_T.shape,'the input dim of preds_S and preds_T differ'
         if len(preds_S.shape) == 4:
             N,C,W,H = preds_S.shape
-            softmax_pred_T = F.softmax(preds_T.view(-1,W*H)/self.tau, dim=1)  # [N,C,H*W]
-            logsoftmax = torch.nn.LogSoftmax(dim=1)
-            loss = torch.sum( - softmax_pred_T * logsoftmax(preds_S.view(-1,W*H)/self.tau))
-            return loss / (C * N)
-        else:
-            N, C, WH = preds_S.shape
-            softmax_pred_T = F.softmax(preds_T.reshape(-1, WH) / self.tau, dim=1)
-            logsoftmax = torch.nn.LogSoftmax(dim=1)
-            loss = torch.sum(- softmax_pred_T * logsoftmax(preds_S.reshape(-1, WH) / self.tau))
-            return loss / (C * N)
+            preds_S = preds_S.reshape(N,C,W*H)
+            preds_T = preds_T.reshape(N,C,W*H)
+        elif len(preds_S.shape) == 2:
+            C,NWH = preds_S.shape
+            softmax_pred_T = F.softmax(preds_T / self.tau, dim=1)
+            softmax_pred_S = F.softmax(preds_S/self.tau, dim=1)
+            loss = self.KL(softmax_pred_S.log(),softmax_pred_T)
+            return loss/C
+        N, C, WH = preds_S.shape
+        softmax_pred_T = F.softmax(preds_T.reshape(-1, WH) / self.tau, dim=1)
+        softmax_pred_S = F.softmax(preds_S.view(-1,WH)/self.tau, dim=1)
+        loss = self.KL(softmax_pred_S.log(),softmax_pred_T)
+        return loss/(N*C)
 
-class CriterionChannelAwareLoss2D(nn.Module):
+class CriterionChannelAwareLossGroup(nn.Module):
     '''
     channel-aware fore/back-ground distillation loss
     '''
     def __init__(self, tau=1.0):
-        super().__init__()
+        super(CriterionChannelAwareLossGroup, self).__init__()
         self.tau = tau
+        self.KL = torch.nn.KLDivLoss(reduction='sum')
 
-    def forward(self, preds, soft):
+    def forward(self, preds, soft, G=5):
         preds_S, preds_T = preds, soft
         assert preds_S.shape == preds_T.shape,'the input dim of preds_S and preds_T differ'
-        N,C,WH = preds_S.shape
-        softmax_pred_T = F.softmax(preds_T.reshape(-1,WH)/self.tau, dim=1)
-        logsoftmax = torch.nn.LogSoftmax(dim=1)
-        loss = torch.sum( - softmax_pred_T * logsoftmax(preds_S.reshape(-1,WH)/self.tau))
-        return loss / (C * N)
+        if len(preds_S.shape) == 4:
+            N,C,W,H = preds_S.shape
+            preds_S = preds_S.reshape(N,C,W*H)
+            preds_T = preds_T.reshape(N,C,W*H)
+
+        N, C, WH = preds_S.shape
+
+        preds_S = preds_S.reshape(N,C/G,G,WH)
+        preds_T = preds_T.reshape(N,C/G,G,WH)
+
+        softmax_pred_T = F.softmax(preds_T.reshape(-1, WH*G) / self.tau, dim=1)
+        softmax_pred_S = F.softmax(preds_S.view(-1,WH*G)/self.tau, dim=1)
+        loss = self.KL(softmax_pred_S.log(),softmax_pred_T)
+        return loss/(N*C)
 

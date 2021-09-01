@@ -2,7 +2,7 @@ _base_ = [
     '../_base_/models/distill.py',
     '../_base_/datasets/ade20k.py',
     '../_base_/default_runtime.py',
-    '../_base_/schedules/schedule_20k.py'
+    '../_base_/schedules/schedule_160k.py'
 ]
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
@@ -11,7 +11,7 @@ log_config = dict(
         dict(type='TensorboardLoggerHook') 
         # dict(type='TextLoggerHook')
     ])
-work_dir = './bs=4,20k/logits2+attn'
+work_dir = './work_dirs/9.1/logits+attn+mlp'
 
 model = dict(
     cfg=dict(
@@ -70,7 +70,7 @@ model = dict(
         # 3. distill_0: 去除logits层所有结果为255的pixel之后进行蒸馏
         # 4. distill_1: 去除logits层所有结果为255的pixel+teacher预测错误的pixel+student预测正确的pixel 之后进行蒸馏
         # 5. distill_2: 去除logits层所有结果为255的pixel+teacher预测错误的pixel 之后进行蒸馏
-        selective='distill_zero',T=0.5,weight=1
+        selective='distill',T=2,weight=1
     ),
     s_pretrain = './pretrained/mit_b1.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b3.512x512.ade.160k.pth'  # 老师的预训练模型
@@ -87,5 +87,5 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=4)
+data = dict(samples_per_gpu=2)
 evaluation = dict(interval=2000, metric='mIoU')  
