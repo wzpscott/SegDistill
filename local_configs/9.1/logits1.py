@@ -8,10 +8,10 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
     interval=50, 
     hooks=[
-        # dict(type='TensorboardLoggerHook') 
-        dict(type='TextLoggerHook')
+        dict(type='TensorboardLoggerHook') 
+        # dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/9.1/attn'
+work_dir = './work_dirs/9.1/logits1'
 
 model = dict(
     cfg=dict(
@@ -54,10 +54,6 @@ model = dict(
         # layers表示要进行蒸馏的层，[teacher_layer,student_layer,[teacher_channel,student_channel],teacher_dim]
         # 其中[teacher_channel,student_channel]和teacher_dim是Adaptor的参数
         layers=[
-            ['backbone.block1.1.norm2','backbone.block1.2.norm2',[64,64],3],
-            ['backbone.block2.1.norm2','backbone.block2.2.norm2',[128,128],3],
-            ['backbone.block3.1.norm2','backbone.block3.17.norm2',[320,320],3],
-            ['backbone.block4.1.norm2','backbone.block4.2.norm2',[512,512],3],
             ['decode_head.linear_pred','decode_head.linear_pred',[150,150],4],
         ],
         # weights_init_strategy,parse_mode,use_attn是之前实验留下的参数
@@ -70,7 +66,7 @@ model = dict(
         # 3. distill_0: 去除logits层所有结果为255的pixel之后进行蒸馏
         # 4. distill_1: 去除logits层所有结果为255的pixel+teacher预测错误的pixel+student预测正确的pixel 之后进行蒸馏
         # 5. distill_2: 去除logits层所有结果为255的pixel+teacher预测错误的pixel 之后进行蒸馏
-        selective='distill',T=2,weight=1
+        selective='distill_1',T=2,weight=1
     ),
     s_pretrain = './pretrained/mit_b1.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b3.512x512.ade.160k.pth'  # 老师的预训练模型
