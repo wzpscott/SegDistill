@@ -54,6 +54,11 @@ class Mlp(nn.Module):
         x = self.drop(x)
         return x
 
+class Hook(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self,x):
+        return x
 
 class Attention(nn.Module):
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., sr_ratio=1):
@@ -68,6 +73,9 @@ class Attention(nn.Module):
         self.q = nn.Linear(dim, dim, bias=qkv_bias)
         self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
+
+        self.ATTN = Hook()
+
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
@@ -107,6 +115,7 @@ class Attention(nn.Module):
         k, v = kv[0], kv[1]
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = self.ATTN(attn)
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
 

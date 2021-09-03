@@ -11,7 +11,7 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook') 
         dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/9.1/logits1'
+work_dir = './work_dirs/9.3/logits2'
 
 model = dict(
     cfg=dict(
@@ -66,7 +66,7 @@ model = dict(
         # 3. distill_0: 去除logits层所有结果为255的pixel之后进行蒸馏
         # 4. distill_1: 去除logits层所有结果为255的pixel+teacher预测错误的pixel+student预测正确的pixel 之后进行蒸馏
         # 5. distill_2: 去除logits层所有结果为255的pixel+teacher预测错误的pixel 之后进行蒸馏
-        selective='distill_1',T=2,weight=1
+        selective='distill_2',T=2,weight=1
     ),
     s_pretrain = './pretrained/mit_b1.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b3.512x512.ade.160k.pth'  # 老师的预训练模型

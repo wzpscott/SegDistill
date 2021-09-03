@@ -27,15 +27,21 @@ class Extractor(nn.Module):
                 if name in teacher_layer:
                     module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='teacher',layer_num=i))
                     print(f'teacher_layer :{teacher_layer} hooked!!!!')
+
             for name, module in student.named_modules():
                 if name == student_layer:
                     module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='student'))
                     print(f'student_layer :{student_layer} hooked!!!!')
 
+
     def hook_fn_forward(self, module, input, output, name, type,layer_num=None):
         if self.training == True:
-            if 'norm' in name or 'fc' in name:
+            if 'fc' in name:
                 output = output.permute(0,2,1)
+            if 'ATTN' in name:
+                output = output.permute(0,1,3,2)
+                B,num_head,C,WH = output.shape
+                output = output.reshape(B,C,num_head*WH)
 
             if type == 'student':
                 self.student_features.append(output)
@@ -189,6 +195,10 @@ class LogitsAdaptor(nn.Module):
             label = x_gt.reshape(-1).unsqueeze(0) # # [1,b*W*H]
             mask =( label!=255)
             label = torch.masked_select(label,mask).unsqueeze(0)
+            
+            if label.numel() == 0:
+                return x_student,x_teacher
+
             x_teacher = torch.masked_select(x_teacher,mask).reshape(C,-1)
             x_student = torch.masked_select(x_student,mask).reshape(C,-1)
 

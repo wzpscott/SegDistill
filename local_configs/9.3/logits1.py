@@ -11,7 +11,7 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook') 
         dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/9.1/logits1'
+work_dir = './work_dirs/9.3/logits1'
 
 model = dict(
     cfg=dict(

@@ -2,16 +2,16 @@ _base_ = [
     '../_base_/models/distill.py',
     '../_base_/datasets/ade20k.py',
     '../_base_/default_runtime.py',
-    '../_base_/schedules/schedule_160k.py'
+    '../_base_/schedules/schedule_20k.py'
 ]
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
     interval=50, 
     hooks=[
-        # dict(type='TensorboardLoggerHook') 
-        dict(type='TextLoggerHook')
+        dict(type='TensorboardLoggerHook') 
+        # dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/9.1/attn'
+work_dir = './bs=4,20k/real_attn'
 
 model = dict(
     cfg=dict(
@@ -54,10 +54,10 @@ model = dict(
         # layers表示要进行蒸馏的层，[teacher_layer,student_layer,[teacher_channel,student_channel],teacher_dim]
         # 其中[teacher_channel,student_channel]和teacher_dim是Adaptor的参数
         layers=[
-            ['backbone.block1.1.norm2','backbone.block1.2.norm2',[64,64],3],
-            ['backbone.block2.1.norm2','backbone.block2.2.norm2',[128,128],3],
-            ['backbone.block3.1.norm2','backbone.block3.17.norm2',[320,320],3],
-            ['backbone.block4.1.norm2','backbone.block4.2.norm2',[512,512],3],
+            ['backbone.block1.1.attn.ATTN','backbone.block1.2.attn.ATTN',[256,256],3],
+            ['backbone.block2.1.attn.ATTN','backbone.block2.2.attn.ATTN',[256,256],3],
+            ['backbone.block3.1.attn.ATTN','backbone.block3.17.attn.ATTN',[256,256],3],
+            ['backbone.block4.1.attn.ATTN','backbone.block4.2.attn.ATTN',[256,256],3],
             ['decode_head.linear_pred','decode_head.linear_pred',[150,150],4],
         ],
         # weights_init_strategy,parse_mode,use_attn是之前实验留下的参数
@@ -87,5 +87,5 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=2,num_workers=0)
+data = dict(samples_per_gpu=2)
 evaluation = dict(interval=2000, metric='mIoU')  
