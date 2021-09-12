@@ -34,7 +34,7 @@ class SDModule_(BaseSegmentor):
         self.teacher = builder.build_segmentor(
             cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
         self.teacher.load_state_dict(torch.load(
-            t_pretrain)['state_dict'])
+            t_pretrain)['state_dict'],strict=True)
         self.teacher.eval()
         for param in self.teacher.parameters():
             param.requires_grad = False
@@ -42,9 +42,6 @@ class SDModule_(BaseSegmentor):
         self.student = builder.build_segmentor(
             cfg, train_cfg=train_cfg, test_cfg=test_cfg)
         self.student_init(strategy='use_pretrain',s_pretrain=s_pretrain,t_pretrain=t_pretrain)
-
-        # print(torch.load(
-        #     s_pretrain)['state_dict'])
         self.features = Extractor(self.student,self.teacher,distillation.layers)
         
         self.loss = DistillationLoss_(distillation = distillation,tau=1)
@@ -81,7 +78,8 @@ class SDModule_(BaseSegmentor):
             new_keys = ['backbone.'+key for key in state_dict]
             d1 = dict( zip( list(state_dict.keys()), new_keys) )
             new_state_dict = {d1[oldK]: value for oldK, value in state_dict.items()}
-            self.student.load_state_dict(new_state_dict,strict=True)
+            self.student.load_state_dict(new_state_dict,strict=False)
+            
         elif strategy == 'use_teacher' :# 跳层初始化
             assert self.cfg_s['backbone']['embed_dim'] == self.cfg_t['backbone']['embed_dim']  # 需要维度一致
 
