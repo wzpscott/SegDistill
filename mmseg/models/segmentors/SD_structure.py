@@ -25,10 +25,11 @@ class SDModule_(BaseSegmentor):
             self.use_teacher = False
         else:
             self.use_teacher = True
-        if 'selective' in distillation:
-            self.selective = distillation['selective']
-        else:
-            self.selective = 'none'
+
+        # if 'selective' in distillation:
+        #     self.selective = distillation['selective']
+        # else:
+        #     self.selective = 'none'
             
         self.teacher = builder.build_segmentor(
             cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
@@ -40,8 +41,13 @@ class SDModule_(BaseSegmentor):
 
         self.student = builder.build_segmentor(
             cfg, train_cfg=train_cfg, test_cfg=test_cfg)
-        self.student_init(strategy='use_pretrain',s_pretrain=s_pretrain,t_pretrain=t_pretrain)
+        # self.student_init(strategy='use_pretrain',s_pretrain=s_pretrain,t_pretrain=t_pretrain)
 
+        self.student.load_state_dict(torch.load(
+            s_pretrain)['state_dict'],strict = True)
+
+        # print(torch.load(
+        #     s_pretrain)['state_dict'])
         self.features = Extractor(self.student,self.teacher,distillation.layers)
         
         self.loss = DistillationLoss_(distillation = distillation,tau=1)
@@ -55,20 +61,17 @@ class SDModule_(BaseSegmentor):
                 _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
             del _
 
-        softs_fea = []
-        preds_fea = []
+            softs_fea = []
+            preds_fea = []
 
-        for i in range(len(self.features.teacher_features)):
-            pred = self.features.student_features[i]
-            soft = self.features.teacher_features[i]
-            softs_fea.append(soft)
-            preds_fea.append(pred)
+            for i in range(len(self.features.teacher_features)):
+                pred = self.features.student_features[i]
+                soft = self.features.teacher_features[i]
+                softs_fea.append(soft)
+                preds_fea.append(pred)
             
-        if self.selective != 'none':
             loss_dict = self.loss(softs_fea, preds_fea, loss_dict,gt_semantic_seg)
-        else:
-            pass
-
+        
         self.features.student_features = []
         self.features.teacher_features = []
         return loss_dict
@@ -81,7 +84,7 @@ class SDModule_(BaseSegmentor):
             new_keys = ['backbone.'+key for key in state_dict]
             d1 = dict( zip( list(state_dict.keys()), new_keys) )
             new_state_dict = {d1[oldK]: value for oldK, value in state_dict.items()}
-            self.student.load_state_dict(new_state_dict,strict=False)
+            self.student.load_state_dict(new_state_dict,strict=True)
         elif strategy == 'use_teacher' :# 跳层初始化
             assert self.cfg_s['backbone']['embed_dim'] == self.cfg_t['backbone']['embed_dim']  # 需要维度一致
 

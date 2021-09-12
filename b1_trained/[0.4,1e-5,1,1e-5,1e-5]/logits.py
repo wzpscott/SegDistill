@@ -35,25 +35,15 @@ model = dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))),
     distillation=dict(
         layers=[[
-            'backbone.block1.1.norm2', 'backbone.block1.2.norm2', [64, 64], 3
-        ], [
-            'backbone.block2.1.norm2', 'backbone.block2.2.norm2', [128, 128], 3
-        ],
-                [
-                    'backbone.block3.1.norm2', 'backbone.block3.17.norm2',
-                    [320, 320], 3
-                ],
-                [
-                    'backbone.block4.1.norm2', 'backbone.block4.2.norm2',
-                    [512, 512], 3
-                ]],
+            'decode_head.linear_pred', 'decode_head.linear_pred', [150, 150], 4
+        ]],
         weights_init_strategy='equal',
         parse_mode='regular',
         use_attn=False,
-        selective='attn',
-        T=0.5,
+        logits_weights=[0.4, 1e-05, 1, 1e-05, 1e-05],
+        T=1,
         weight=1),
-    s_pretrain='./pretrained/mit_b1.pth',
+    s_pretrain='./pretrained/segformer.b1.512x512.ade.160k.pth',
     t_pretrain='./pretrained/segformer.b3.512x512.ade.160k.pth',
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
@@ -169,8 +159,8 @@ data = dict(
 log_config = dict(interval=50, hooks=[dict(type='TensorboardLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = 'bs=4,20k/attn/iter_12000.pth'
-resume_from = 'bs=4,20k/attn/iter_12000.pth'
+load_from = None
+resume_from = None
 workflow = [('train', 1)]
 cudnn_benchmark = True
 optimizer = dict(
@@ -195,5 +185,5 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=20000)
 checkpoint_config = dict(by_epoch=False, interval=2000)
 evaluation = dict(interval=2000, metric='mIoU')
-work_dir = './bs=4,20k/attn'
+work_dir = './b1_trained/[0.4,1e-5,1,1e-5,1e-5]'
 gpu_ids = range(0, 1)

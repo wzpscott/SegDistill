@@ -164,10 +164,15 @@ class Adaptor(nn.Module):
         return x,x_teacher
 
 class LogitsAdaptor(nn.Module):
-    def __init__(self,input_size,output_size,distill_strategy):
+    def __init__(self,input_size,output_size,weights=None):
         super().__init__()
-        self.distill_strategy = distill_strategy
-        self.ff = self.ff = nn.Conv2d(input_size,output_size, kernel_size=1, stride=1, padding=0)
+        self.ff = nn.Conv2d(input_size,output_size, kernel_size=1, stride=1, padding=0)
+
+        if weights:
+            self.weights = weights
+        else:
+            self.weights = [1,1,1,1,1]
+
     def forward(self,x_student,x_teacher,x_gt):
         from mmseg.ops import resize
         # print(x_student.shape)
@@ -185,50 +190,31 @@ class LogitsAdaptor(nn.Module):
             mode='bilinear',
             align_corners=False)  # [b,C,W,H]  
 
-        if self.distill_strategy == 'distill':
-            return x_student,x_teacher
-        else:
-            b, C, W, H = x_teacher.shape
-            x_teacher = x_teacher.permute(1,0,2,3).reshape(C,-1) # [C,b*W*H]
-            x_student = x_student.permute(1,0,2,3).reshape(C,-1) # [C,b*W*H]
+        x_gt = x_gt.squeeze(1)
+        b, C, W, H = x_teacher.shape
+        mask = torch.zeros(x_gt.shape).cuda()
 
-            label = x_gt.reshape(-1).unsqueeze(0) # # [1,b*W*H]
-            mask =( label!=255)
-            label = torch.masked_select(label,mask).unsqueeze(0)
-            
-            if label.numel() == 0:
-                return x_student,x_teacher
+        bg_mask = (x_gt == 255)
 
-            x_teacher = torch.masked_select(x_teacher,mask).reshape(C,-1)
-            x_student = torch.masked_select(x_student,mask).reshape(C,-1)
+        student_pd = torch.argmax(x_student,dim=1)
+        teacher_pd = torch.argmax(x_teacher,dim=1)
 
-            student_pd = torch.argmax(x_student,dim=0)
-            teacher_pd = torch.argmax(x_teacher,dim=0)
+        Sr = (student_pd == x_gt) # student right
+        Tr = (teacher_pd == x_gt) # teacher right
+        SrTr_mask = Sr & Tr
+        SfTr_mask = (~Sr) & Tr
+        SfTf_mask = (~Sr) & (~Tr) & (~bg_mask)
+        SrTf_mask = Sr & (~Tr)
 
-            pre1 = (teacher_pd == label).bool()
-            pre2 = (student_pd != label).bool()
+        masks = [bg_mask,SrTr_mask,SfTr_mask,SfTf_mask,SrTf_mask]
+        for i in range(5):
+            mask += self.weights[i] * masks[i]
 
-            if '0' in self.distill_strategy:
-                learn_mask = torch.ones(pre1.shape).bool().cuda()
-            elif '1' in self.distill_strategy:
-                learn_mask = (pre1).bool()
-            elif '2' in self.distill_strategy:
-                learn_mask = (pre1 & pre2).bool()
-            elif 'zero' in self.distill_strategy:
-                learn_mask = torch.zeros(pre1.shape).bool().cuda()
+        return x_student,x_teacher,mask
 
-            learn_proportion = torch.sum(learn_mask)/(learn_mask.shape[1]*learn_mask.shape[0])
-
-            if learn_proportion.item() == 0:
-                return x_student.reshape(C,-1),x_teacher.reshape(C,-1)
-            else:
-                x_teacher = torch.masked_select(x_teacher,learn_mask)
-                x_student = torch.masked_select(x_student,learn_mask)
-                return x_student.reshape(C,-1),x_teacher.reshape(C,-1)
 class DistillationLoss_(nn.Module):
     def __init__(self,distillation,tau):
         super().__init__()
-        self.kd_loss = CriterionChannelAwareLoss(1)
         # self.kd_loss = torch.nn.KLDivLoss()
         if 'T' in distillation:
             self.T = distillation['T']
@@ -240,7 +226,9 @@ class DistillationLoss_(nn.Module):
             self.weight = 1
         print('weight:', self.weight)
         print('T:', self.T)
-        self.selective = distillation['selective']
+        self.kd_loss = CriterionChannelAwareLoss(self.T)
+        # self.kd_loss = KLdiv(self.T)
+        self.logits_weights = distillation['logits_weights']
         self.adaptors = nn.ModuleList()
 
         # self.conv_t_t = nn.ConvTranspose2d(150, 150, 4, stride=4)
@@ -254,7 +242,7 @@ class DistillationLoss_(nn.Module):
             if self.use_attn:
                 self.adaptors.append(AttnAdaptor(student_dim,teacher_dim,len(teacher_layers)))
             elif 'linear_pred' in student_layer:
-                self.adaptors.append(LogitsAdaptor(student_dim,teacher_dim,self.selective))
+                self.adaptors.append(LogitsAdaptor(student_dim,teacher_dim,self.logits_weights))
                 print(f'add an logits adaptor of shape {student_dim} to {teacher_dim} in {student_layer}')
             else:
                 self.adaptors.append(Adaptor(student_dim,teacher_dim,dim))
@@ -289,10 +277,10 @@ class DistillationLoss_(nn.Module):
                 for j in range(attn.shape[0]):
                     losses.update({'attn' + str(i) + 'layer' + str(j): attn[j].clone()})
             else:
-                pred[i],soft[i] = adaptor(pred[i],soft[i][0],gt_semantic_seg)
+                pred[i],soft[i],mask = adaptor(pred[i],soft[i][0],gt_semantic_seg)
 
             if self.strategy == 'equal':
-                loss = self.weights[i] * self.kd_loss(pred[i], soft[i])
+                loss = self.weights[i] * self.kd_loss(pred[i], soft[i], mask)
                 name = self.layers[i]
                 losses.update({'loss_' + name: loss})
             elif self.strategy == 'self_adjust':

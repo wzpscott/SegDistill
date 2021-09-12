@@ -35,32 +35,15 @@ model = dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))),
     distillation=dict(
         layers=[[
-            'backbone.block1.1.attn.ATTN', 'backbone.block1.2.attn.ATTN',
-            [256, 256], 3
-        ],
-                [
-                    'backbone.block2.1.attn.ATTN',
-                    'backbone.block2.2.attn.ATTN', [256, 256], 3
-                ],
-                [
-                    'backbone.block3.1.attn.ATTN',
-                    'backbone.block3.17.attn.ATTN', [256, 256], 3
-                ],
-                [
-                    'backbone.block4.1.attn.ATTN',
-                    'backbone.block4.2.attn.ATTN', [256, 256], 3
-                ],
-                [
-                    'decode_head.linear_pred', 'decode_head.linear_pred',
-                    [150, 150], 4
-                ]],
+            'decode_head.linear_pred', 'decode_head.linear_pred', [150, 150], 4
+        ]],
         weights_init_strategy='equal',
         parse_mode='regular',
         use_attn=False,
-        selective='distill',
-        T=2,
+        logits_weights=[1, 1, 1, 1, 1],
+        T=1,
         weight=1),
-    s_pretrain='./pretrained/mit_b1.pth',
+    s_pretrain='./pretrained/segformer.b1.512x512.ade.160k.pth',
     t_pretrain='./pretrained/segformer.b3.512x512.ade.160k.pth',
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
@@ -173,7 +156,7 @@ data = dict(
                     dict(type='Collect', keys=['img'])
                 ])
         ]))
-log_config = dict(interval=10, hooks=[dict(type='TextLoggerHook')])
+log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 load_from = None
@@ -202,5 +185,5 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=20000)
 checkpoint_config = dict(by_epoch=False, interval=2000)
 evaluation = dict(interval=2000, metric='mIoU')
-work_dir = './bs=4,20k/test'
+work_dir = './bs=4,20k/trained/[0.4,1e-5,1,1e-5,1e-5]_3'
 gpu_ids = range(0, 1)

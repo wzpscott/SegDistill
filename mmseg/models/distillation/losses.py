@@ -612,27 +612,51 @@ class CriterionChannelAwareLoss(nn.Module):
     def __init__(self, tau=1.0):
         super(CriterionChannelAwareLoss, self).__init__()
         self.tau = tau
-        self.KL = torch.nn.KLDivLoss(reduction='sum')
+        self.KL = torch.nn.KLDivLoss(reduction='none')
 
-    def forward(self, preds, soft):
+    def forward(self, preds, soft, mask):
         preds_S, preds_T = preds, soft
         assert preds_S.shape == preds_T.shape,'the input dim of preds_S and preds_T differ'
         if len(preds_S.shape) == 4:
             N,C,W,H = preds_S.shape
             preds_S = preds_S.reshape(N,C,W*H)
             preds_T = preds_T.reshape(N,C,W*H)
-        elif len(preds_S.shape) == 2:
-            C,NWH = preds_S.shape
-            softmax_pred_T = F.softmax(preds_T/self.tau, dim=1)
-            softmax_pred_S = F.softmax(preds_S/self.tau, dim=1)
+            mask = mask.reshape(N,W*H)
 
-            loss = self.KL(softmax_pred_S.log(),softmax_pred_T)
-            return loss/C
         N, C, WH = preds_S.shape
-        softmax_pred_T = F.softmax(preds_T.reshape(-1, WH) / self.tau, dim=1)
-        softmax_pred_S = F.softmax(preds_S.view(-1,WH)/self.tau, dim=1)
-        loss = self.KL(softmax_pred_S.log(),softmax_pred_T)
+        softmax_pred_T = F.softmax(preds_T/self.tau, dim=2)
+        softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=2)
+
+        loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
+        loss = (loss*mask).sum()
+
         return loss/(N*C)
+
+class KLdiv(nn.Module):
+    def __init__(self, tau=1.0):
+        super().__init__()
+        self.tau = tau
+        self.KL = torch.nn.KLDivLoss(reduction='none')
+    def forward(self, preds, soft, mask):
+        preds_S, preds_T = preds, soft
+        if len(preds_S.shape) == 4:
+            N,C,W,H = preds_S.shape
+            preds_S = preds_S.reshape(N,C,W*H)
+            preds_T = preds_T.reshape(N,C,W*H)
+            mask = mask.reshape(N,W*H)
+        N, C, WH = preds_S.shape
+        softmax_pred_T = F.softmax(preds_T/self.tau, dim=1)
+        softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=1)
+
+        loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
+        loss = (loss*mask).sum()
+        # print('preds_S',preds_S)
+        # print('preds_T',preds_T)
+        # print('softmax_pred_S',softmax_pred_S)
+        # print('softmax_pred_T',softmax_pred_T)
+        # print(loss)
+        return loss/(N*WH)
+
 
 class CriterionChannelAwareLossGroup(nn.Module):
     '''
