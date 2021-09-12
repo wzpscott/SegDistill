@@ -41,10 +41,7 @@ class SDModule_(BaseSegmentor):
 
         self.student = builder.build_segmentor(
             cfg, train_cfg=train_cfg, test_cfg=test_cfg)
-        # self.student_init(strategy='use_pretrain',s_pretrain=s_pretrain,t_pretrain=t_pretrain)
-
-        self.student.load_state_dict(torch.load(
-            s_pretrain)['state_dict'],strict = True)
+        self.student_init(strategy='use_pretrain',s_pretrain=s_pretrain,t_pretrain=t_pretrain)
 
         # print(torch.load(
         #     s_pretrain)['state_dict'])
