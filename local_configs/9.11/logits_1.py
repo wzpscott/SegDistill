@@ -2,25 +2,25 @@ _base_ = [
     '../_base_/models/distill.py',
     '../_base_/datasets/ade20k.py',
     '../_base_/default_runtime.py',
-    '../_base_/schedules/schedule_160k.py'
+    '../_base_/schedules/schedule_20k.py'
 ]
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 log_config = dict(  
     interval=50, 
     hooks=[
-        # dict(type='TensorboardLoggerHook') 
-        dict(type='TextLoggerHook')
+        dict(type='TensorboardLoggerHook') 
+        # dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/[1,1,2,1e-5,1e-5]'
+work_dir = './work_dirs/b0b4/select'
 model = dict(
     cfg=dict(
             type='EncoderDecoder',
-        backbone=dict(
-            type='mit_b1',
-            style='pytorch'),
-        decode_head=dict(
+            backbone=dict(
+                type='mit_b0',
+                style='pytorch'),
+            decode_head=dict(
             type='SegFormerHead',
-            in_channels=[64, 128, 320, 512],
+            in_channels=[32, 64, 160, 256],
             in_index=[0, 1, 2, 3],
             feature_strides=[4, 8, 16, 32],
             channels=128,
@@ -34,7 +34,7 @@ model = dict(
     cfg_t=dict(
         type='EncoderDecoder',
         backbone=dict(
-            type='mit_b3',
+            type='mit_b4',
             style='pytorch'),
         decode_head=dict(
             type='SegFormerHead',
@@ -59,11 +59,11 @@ model = dict(
         weights_init_strategy='equal',
         parse_mode='regular',
         use_attn=False,
-        logits_weights=[1,1,2,0.1,1e-5], # [bg_mask,SrTr_mask,SfTr_mask,SfTf_mask,SrTf_mask]
+        logits_weights=[1e-5,1e-5,1,1e-5,1e-5], # [bg_mask,SrTr_mask,SfTr_mask,SfTf_mask,SrTf_mask]
         T=1,weight=1
     ),
-    s_pretrain = './pretrained/mit_b1.pth', # 学生的预训练模型
-    t_pretrain = './pretrained/segformer.b3.512x512.ade.160k.pth'  # 老师的预训练模型
+    s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
+    t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth'  # 老师的预训练模型
 )
 optimizer = dict(_delete_=True, type='AdamW', lr=0.00006, betas=(0.9,0.999), weight_decay=0.01,
                 paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
@@ -77,5 +77,5 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=2)
+data = dict(samples_per_gpu=4)
 evaluation = dict(interval=2000, metric='mIoU')  

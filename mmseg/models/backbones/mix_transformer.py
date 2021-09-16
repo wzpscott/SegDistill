@@ -141,7 +141,7 @@ class Block(nn.Module):
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
-
+        self.FEA = Hook()
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -162,6 +162,8 @@ class Block(nn.Module):
     def forward(self, x, H, W):
         x = x + self.drop_path(self.attn(self.norm1(x), H, W))
         x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
+
+        x = self.FEA(x)
 
         return x
 

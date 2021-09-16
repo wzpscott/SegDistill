@@ -616,7 +616,8 @@ class CriterionChannelAwareLoss(nn.Module):
 
     def forward(self, preds, soft, mask):
         preds_S, preds_T = preds, soft
-        assert preds_S.shape == preds_T.shape,'the input dim of preds_S and preds_T differ'
+        if mask is None:
+            mask = torch.ones(preds_S.shape[0],preds_S.shape[2]).cuda()
         if len(preds_S.shape) == 4:
             N,C,W,H = preds_S.shape
             preds_S = preds_S.reshape(N,C,W*H)
@@ -638,7 +639,11 @@ class KLdiv(nn.Module):
         self.tau = tau
         self.KL = torch.nn.KLDivLoss(reduction='none')
     def forward(self, preds, soft, mask):
+
         preds_S, preds_T = preds, soft
+        attn_weight = 0.2 if len(preds_S.shape) == 4 else 1
+        if mask is None:
+            mask = torch.ones(preds_S.shape[0],preds_S.shape[2]).cuda()
         if len(preds_S.shape) == 4:
             N,C,W,H = preds_S.shape
             preds_S = preds_S.reshape(N,C,W*H)
@@ -649,39 +654,36 @@ class KLdiv(nn.Module):
         softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=1)
 
         loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
-        loss = (loss*mask).sum()
-        # print('preds_S',preds_S)
-        # print('preds_T',preds_T)
-        # print('softmax_pred_S',softmax_pred_S)
-        # print('softmax_pred_T',softmax_pred_T)
-        # print(loss)
+        loss = (loss*mask).sum()*attn_weight
         return loss/(N*WH)
 
-
 class CriterionChannelAwareLossGroup(nn.Module):
-    '''
-    channel-aware fore/back-ground distillation loss
-    '''
     def __init__(self, tau=1.0):
-        super(CriterionChannelAwareLossGroup, self).__init__()
+        super().__init__()
         self.tau = tau
-        self.KL = torch.nn.KLDivLoss(reduction='sum')
+        self.KL = torch.nn.KLDivLoss(reduction='none')
 
-    def forward(self, preds, soft, G=5):
+    def forward(self, preds, soft, mask, G=4):
         preds_S, preds_T = preds, soft
-        assert preds_S.shape == preds_T.shape,'the input dim of preds_S and preds_T differ'
+        if mask is None:
+            mask = torch.ones(preds_S.shape[0],preds_S.shape[2]).cuda()
+        attn_weight = 0.2 if len(preds_S.shape) == 4 else 1
         if len(preds_S.shape) == 4:
             N,C,W,H = preds_S.shape
             preds_S = preds_S.reshape(N,C,W*H)
             preds_T = preds_T.reshape(N,C,W*H)
+            mask = mask.reshape(N,W*H)
 
         N, C, WH = preds_S.shape
+        if C % G==0:
+            preds_S = preds_S.reshape(N,C//G,G*WH)
+            preds_T = preds_T.reshape(N,C//G,G*WH)
 
-        preds_S = preds_S.reshape(N,C/G,G,WH)
-        preds_T = preds_T.reshape(N,C/G,G,WH)
+        
+        softmax_pred_T = F.softmax(preds_T/self.tau, dim=2)
+        softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=2)
 
-        softmax_pred_T = F.softmax(preds_T.reshape(-1, WH*G) / self.tau, dim=1)
-        softmax_pred_S = F.softmax(preds_S.view(-1,WH*G)/self.tau, dim=1)
-        loss = self.KL(softmax_pred_S.log(),softmax_pred_T)
+        loss = self.KL(softmax_pred_S,softmax_pred_T).sum()*attn_weight
+
         return loss/(N*C)
 

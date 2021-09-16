@@ -135,18 +135,10 @@ class Adaptor(nn.Module):
         super().__init__()
         self.total_dim = total_dim
 
-        # ff = nn.Sequential(
-        #     nn.Conv1d(input_size,input_size, kernel_size=1, stride=1, padding=0),
-        #     nn.GELU(),
-        #     nn.Conv1d(input_size,output_size, kernel_size=1, stride=1, padding=0),
-        #     nn.GELU(),
-        #     nn.Conv1d(output_size,output_size, kernel_size=1, stride=1, padding=0),
-        # )
-        ff = nn.Conv1d(input_size,input_size, kernel_size=1, stride=1, padding=0)
+        # ff = nn.Conv1d(input_size,input_size, kernel_size=1, stride=1, padding=0)
 
         if total_dim == 3:
-            # self.ff = nn.Conv1d(input_size,output_size, kernel_size=1, stride=1, padding=0)
-            self.ff = ff
+            self.ff = nn.Conv1d(input_size,output_size, kernel_size=1, stride=1, padding=0)
         elif total_dim == 4:
             self.ff = nn.Conv2d(input_size,output_size, kernel_size=1, stride=1, padding=0)
 
@@ -161,7 +153,7 @@ class Adaptor(nn.Module):
             x = self.ff(x)
         else:
             raise ValueError('wrong total_dim')
-        return x,x_teacher
+        return x,x_teacher,None
 
 class LogitsAdaptor(nn.Module):
     def __init__(self,input_size,output_size,weights=None):
@@ -215,7 +207,6 @@ class LogitsAdaptor(nn.Module):
 class DistillationLoss_(nn.Module):
     def __init__(self,distillation,tau):
         super().__init__()
-        # self.kd_loss = torch.nn.KLDivLoss()
         if 'T' in distillation:
             self.T = distillation['T']
         else:
@@ -226,8 +217,13 @@ class DistillationLoss_(nn.Module):
             self.weight = 1
         print('weight:', self.weight)
         print('T:', self.T)
-        self.kd_loss = CriterionChannelAwareLoss(self.T)
-        # self.kd_loss = KLdiv(self.T)
+        if distillation['loss_func'] == 'kl':
+            self.kd_loss = KLdiv(self.T)
+        elif distillation['loss_func'] == 'ca':
+            self.kd_loss = CriterionChannelAwareLoss(self.T)
+        elif distillation['loss_func'] == 'group':
+            self.kd_loss = CriterionChannelAwareLossGroup(self.T)
+        
         self.logits_weights = distillation['logits_weights']
         self.adaptors = nn.ModuleList()
 
@@ -253,13 +249,7 @@ class DistillationLoss_(nn.Module):
         # add gradients to weight of each layer's loss
         self.strategy = distillation['weights_init_strategy']
         if self.strategy=='equal':
-            # weights = [1 for i in range(len(layers))]
-            if len(layers) == 1:
-                weights = [1]
-            elif len(layers) == 5:
-                weights = [0.25,0.25,0.25,0.25,1]
-            elif len(layers) == 9:
-                weights = [0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,1]
+            weights = [1 for i in range(len(layers))]
             weights = nn.Parameter(torch.Tensor(weights),requires_grad=False)
             self.weights = weights
         elif self.strategy=='self_adjust':

@@ -25,11 +25,6 @@ class SDModule_(BaseSegmentor):
             self.use_teacher = False
         else:
             self.use_teacher = True
-
-        # if 'selective' in distillation:
-        #     self.selective = distillation['selective']
-        # else:
-        #     self.selective = 'none'
             
         self.teacher = builder.build_segmentor(
             cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
@@ -42,9 +37,9 @@ class SDModule_(BaseSegmentor):
         self.student = builder.build_segmentor(
             cfg, train_cfg=train_cfg, test_cfg=test_cfg)
         self.student_init(strategy='use_pretrain',s_pretrain=s_pretrain,t_pretrain=t_pretrain)
-        self.features = Extractor(self.student,self.teacher,distillation.layers)
-        
-        self.loss = DistillationLoss_(distillation = distillation,tau=1)
+        if self.use_teacher:
+            self.features = Extractor(self.student,self.teacher,distillation.layers)
+            self.loss = DistillationLoss_(distillation = distillation,tau=1)
         self.align_corners = False
         self.test_mode = 'whole'
 
@@ -66,8 +61,8 @@ class SDModule_(BaseSegmentor):
             
             loss_dict = self.loss(softs_fea, preds_fea, loss_dict,gt_semantic_seg)
         
-        self.features.student_features = []
-        self.features.teacher_features = []
+            self.features.student_features = []
+            self.features.teacher_features = []
         return loss_dict
     
     def student_init(self,strategy,s_pretrain=None,t_pretrain=None,distillation=None):
