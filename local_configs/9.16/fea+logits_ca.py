@@ -83,3 +83,4 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=2000, metric='mIoU')  
+resume_from = './work_dirs/9.16/fea+logits_ca/latest.pth'
