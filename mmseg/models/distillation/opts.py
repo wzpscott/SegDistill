@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F 
 
+from mmseg.ops import resize
+
 class Extractor(nn.Module):
     def __init__(self, student, teacher, layers):
         super().__init__()
@@ -38,10 +40,10 @@ class Extractor(nn.Module):
         if self.training == True:
             if 'fc' in name:
                 output = output.permute(0,2,1)
-            if 'ATTN' in name:
+            if 'ATTN' in name: #[B,num_head,WH,WH]
                 output = output.permute(0,1,3,2)
-                B,num_head,C,WH = output.shape
-                output = output.reshape(B,C,num_head*WH)
+                B,num_head,WH,_ = output.shape
+                output = output.reshape(B*num_head,WH,_)
 
             if type == 'student':
                 self.student_features.append(output)
@@ -143,16 +145,16 @@ class Adaptor(nn.Module):
             self.ff = nn.Conv2d(input_size,output_size, kernel_size=1, stride=1, padding=0)
 
     def forward(self,x,x_teacher,gt_semantic_seg):
-        if self.total_dim == 2:
-            x = x
-        elif self.total_dim == 3:
-            # x = x.permute(0,2,1)
-            x = self.ff(x)
-            # x = x.permute(0,2,1)
-        elif self.total_dim == 4:
-            x = self.ff(x)
-        else:
-            raise ValueError('wrong total_dim')
+        # if self.total_dim == 2:
+        #     x = x
+        # elif self.total_dim == 3:
+        #     # x = x.permute(0,2,1)
+        #     x = self.ff(x)
+        #     # x = x.permute(0,2,1)
+        # elif self.total_dim == 4:
+        #     x = self.ff(x)
+        # else:
+        #     raise ValueError('wrong total_dim')
         return x,x_teacher,None
 
 class LogitsAdaptor(nn.Module):
@@ -166,16 +168,13 @@ class LogitsAdaptor(nn.Module):
             self.weights = [1,1,1,1,1]
 
     def forward(self,x_student,x_teacher,x_gt):
-        from mmseg.ops import resize
-        # print(x_student.shape)
-        # print(x_teacher.shape)
-        # print(x_gt.shape)
+
         x_student = resize(
             input=x_student,
             size=x_gt.shape[2:],
             mode='bilinear',
             align_corners=False)
-        x_student = self.ff(x_student)
+        # x_student = self.ff(x_student)
         x_teacher = resize(
             input=x_teacher,
             size=x_gt.shape[2:],
@@ -186,13 +185,13 @@ class LogitsAdaptor(nn.Module):
         b, C, W, H = x_teacher.shape
         mask = torch.zeros(x_gt.shape).cuda()
 
-        bg_mask = (x_gt == 255)
+        bg_mask = (x_gt == 255).detach()
 
         student_pd = torch.argmax(x_student,dim=1)
         teacher_pd = torch.argmax(x_teacher,dim=1)
 
-        Sr = (student_pd == x_gt) # student right
-        Tr = (teacher_pd == x_gt) # teacher right
+        Sr = (student_pd == x_gt).detach() # student right
+        Tr = (teacher_pd == x_gt).detach() # teacher right
         SrTr_mask = Sr & Tr
         SfTr_mask = (~Sr) & Tr
         SfTf_mask = (~Sr) & (~Tr) & (~bg_mask)
@@ -249,7 +248,7 @@ class DistillationLoss_(nn.Module):
         # add gradients to weight of each layer's loss
         self.strategy = distillation['weights_init_strategy']
         if self.strategy=='equal':
-            weights = [1 for i in range(len(layers))]
+            weights = [1/len(layers) for i in range(len(layers))]
             weights = nn.Parameter(torch.Tensor(weights),requires_grad=False)
             self.weights = weights
         elif self.strategy=='self_adjust':
@@ -257,6 +256,8 @@ class DistillationLoss_(nn.Module):
             self.weights = weights
         else:
             raise ValueError('Wrong weights init strategy')
+
+        self.ce = nn.CrossEntropyLoss(reduction='none',ignore_index=255)
 
     def forward(self, soft, pred, losses,gt_semantic_seg=None):
         for i in range(len(pred)):
@@ -273,6 +274,9 @@ class DistillationLoss_(nn.Module):
                 loss = self.weights[i] * self.kd_loss(pred[i], soft[i], mask)
                 name = self.layers[i]
                 losses.update({'loss_' + name: loss})
+                if 'pred' in name:
+                    decode_loss = (losses['decode.loss_seg']*mask).mean()
+                    losses.update({'decode.loss_seg': decode_loss})
             elif self.strategy == 'self_adjust':
                 loss = (1 / (self.weights[0] ** 2)) * \
                         self.kd_loss(pred[i], soft[i]) \

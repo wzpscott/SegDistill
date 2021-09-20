@@ -16,11 +16,11 @@ model = dict(
     cfg=dict(
             type='EncoderDecoder',
             backbone=dict(
-                type='mit_b0',
+                type='mit_b1',
                 style='pytorch'),
             decode_head=dict(
             type='SegFormerHead',
-            in_channels=[32, 64, 160, 256],
+            in_channels=[64, 128, 320, 512],
             in_index=[0, 1, 2, 3],
             feature_strides=[4, 8, 16, 32],
             channels=128,
@@ -56,12 +56,12 @@ model = dict(
             ['backbone.block1.1.attn.ATTN','backbone.block1.2.attn.ATTN',[256,256],3],
             ['backbone.block1.1.mlp.fc2','backbone.block1.2.mlp.fc2',[32,64],3],
             ['backbone.block2.1.attn.ATTN','backbone.block2.2.attn.ATTN',[256,256],3],
-            ['backbone.block2.1.mlp.fc2','backbone.block2.2.mlp.fc2',[64,128],3],
+            # ['backbone.block2.1.mlp.fc2','backbone.block2.2.mlp.fc2',[64,128],3],
             ['backbone.block3.1.attn.ATTN','backbone.block3.17.attn.ATTN',[256,256],3],
-            ['backbone.block3.1.mlp.fc2','backbone.block3.17.mlp.fc2',[160,320],3],
+            # ['backbone.block3.1.mlp.fc2','backbone.block3.17.mlp.fc2',[160,320],3],
             ['backbone.block4.1.attn.ATTN','backbone.block4.2.attn.ATTN',[256,256],3],
-            ['backbone.block4.1.mlp.fc2','backbone.block4.2.mlp.fc2',[256,512],3],
-            ['decode_head.linear_pred','decode_head.linear_pred',[150,150],4],
+            # ['backbone.block4.1.mlp.fc2','backbone.block4.2.mlp.fc2',[256,512],3],
+            # ['decode_head.linear_pred','decode_head.linear_pred',[150,150],4],
         ],
         # weights_init_strategy,parse_mode,use_attn是之前实验留下的参数
         weights_init_strategy='equal',
@@ -70,7 +70,7 @@ model = dict(
         logits_weights=[1,1,1,1,1], # [bg_mask,SrTr_mask,SfTr_mask,SfTf_mask,SrTf_mask]
         T=1,weight=1,loss_func ='ca'
     ),
-    s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
+    s_pretrain = './pretrained/mit_b1.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth'  # 老师的预训练模型
 )
 optimizer = dict(_delete_=True, type='AdamW', lr=0.00006, betas=(0.9,0.999), weight_decay=0.01,
@@ -87,4 +87,4 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=2000, metric='mIoU')  
-resume_from = './work_dirs/9.16/attn+fea+logits_ca/latest.pth'
+# resume_from = './work_dirs/9.16/attn+fea+logits_ca/latest.pth'

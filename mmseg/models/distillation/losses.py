@@ -630,8 +630,8 @@ class CriterionChannelAwareLoss(nn.Module):
 
         loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
         loss = (loss*mask).sum()
-
         return loss/(N*C)
+
 
 class KLdiv(nn.Module):
     def __init__(self, tau=1.0):
@@ -654,8 +654,10 @@ class KLdiv(nn.Module):
         softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=1)
 
         loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
-        loss = (loss*mask).sum()*attn_weight
-        return loss/(N*WH)
+        # loss = (loss*mask).sum()*attn_weight
+        # return loss/(N*WH)
+        loss = (loss*mask).mean()*attn_weight
+        return loss
 
 class CriterionChannelAwareLossGroup(nn.Module):
     def __init__(self, tau=1.0):

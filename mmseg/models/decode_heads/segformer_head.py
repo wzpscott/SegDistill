@@ -17,6 +17,9 @@ import attr
 
 from IPython import embed
 
+from ..builder import build_loss
+from mmcv.runner import auto_fp16, force_fp32
+
 class MLP(nn.Module):
     """
     Linear Embedding
@@ -38,6 +41,14 @@ class SegFormerHead(BaseDecodeHead):
     """
     def __init__(self, feature_strides, **kwargs):
         super(SegFormerHead, self).__init__(input_transform='multiple_select', **kwargs)
+
+        loss_decode=dict(
+                     type='CrossEntropyLoss',
+                     use_sigmoid=False,
+                     loss_weight=1.0,
+                     reduction='none')
+        self.loss_decode = build_loss(loss_decode)
+
         assert len(feature_strides) == len(self.in_channels)
         assert min(feature_strides) == feature_strides[0]
         self.feature_strides = feature_strides
@@ -85,3 +96,25 @@ class SegFormerHead(BaseDecodeHead):
         x = self.linear_pred(x)
 
         return x
+
+    # @force_fp32(apply_to=('seg_logit', ))
+    # def losses(self, seg_logit, seg_label):
+    #     """Compute segmentation loss."""
+    #     loss = dict()
+    #     seg_logit = resize(
+    #         input=seg_logit,
+    #         size=seg_label.shape[2:],
+    #         mode='bilinear',
+    #         align_corners=self.align_corners)
+    #     if self.sampler is not None:
+    #         seg_weight = self.sampler.sample(seg_logit, seg_label)
+    #     else:
+    #         seg_weight = None
+    #     seg_label = seg_label.squeeze(1)
+    #     loss['loss_seg'] = self.loss_decode(
+    #         seg_logit,
+    #         seg_label,
+    #         weight=seg_weight,
+    #         ignore_index=self.ignore_index)
+    #     loss['acc_seg'] = accuracy(seg_logit, seg_label)
+    #     return loss

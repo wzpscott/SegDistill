@@ -45,6 +45,7 @@ class SDModule_(BaseSegmentor):
 
     def forward_train(self, img, img_metas, gt_semantic_seg):
         loss_dict = self.student(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
+
         if self.use_teacher:
             with torch.no_grad():
                 _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
@@ -58,7 +59,6 @@ class SDModule_(BaseSegmentor):
                 soft = self.features.teacher_features[i]
                 softs_fea.append(soft)
                 preds_fea.append(pred)
-            
             loss_dict = self.loss(softs_fea, preds_fea, loss_dict,gt_semantic_seg)
         
             self.features.student_features = []
