@@ -112,9 +112,9 @@ class Attention(nn.Module):
             kv = self.kv(x_).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         else:
             kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        k, v = kv[0], kv[1] # [B,num_head,WH,C/num_head]
+        k, v = kv[0], kv[1] # [B,num_head,WH',C/num_head]
 
-        attn = (q @ k.transpose(-2, -1)) * self.scale # [B,num_head,WH,WH]
+        attn = (q @ k.transpose(-2, -1)) * self.scale # [B,num_head,WH,WH']
         attn = self.ATTN(attn)
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)

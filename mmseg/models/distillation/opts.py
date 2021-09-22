@@ -40,10 +40,11 @@ class Extractor(nn.Module):
         if self.training == True:
             if 'fc' in name:
                 output = output.permute(0,2,1)
-            if 'ATTN' in name: #[B,num_head,WH,WH]
-                output = output.permute(0,1,3,2)
-                B,num_head,WH,_ = output.shape
-                output = output.reshape(B*num_head,WH,_)
+            # if 'ATTN' in name: #[B,num_head,WH,WH]
+            #     output = output.permute(0,1,3,2)
+            #     B,num_head,WH,_ = output.shape
+            #     output = output.reshape(B*num_head,WH,_)
+            #     print(B,num_head,WH,_)
 
             if type == 'student':
                 self.student_features.append(output)
@@ -142,9 +143,15 @@ class Adaptor(nn.Module):
         if total_dim == 3:
             self.ff = nn.Conv1d(input_size,output_size, kernel_size=1, stride=1, padding=0)
         elif total_dim == 4:
-            self.ff = nn.Conv2d(input_size,output_size, kernel_size=1, stride=1, padding=0)
+            # [b,num_head,WH,WH']
+            self.ff1 = nn.Linear(256,256)
+            self.ff2 = nn.Conv2d(input_size,output_size, kernel_size=1, stride=1, padding=0)
 
     def forward(self,x,x_teacher,gt_semantic_seg):
+        if self.total_dim == 4:
+            x = self.ff1(x)
+            x = self.ff2(x)
+
         # if self.total_dim == 2:
         #     x = x
         # elif self.total_dim == 3:

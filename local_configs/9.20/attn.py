@@ -52,14 +52,25 @@ model = dict(
         distillation = dict(
         # layers表示要进行蒸馏的层，[teacher_layer,student_layer,[teacher_channel,student_channel],teacher_dim]
         # 其中[teacher_channel,student_channel]和teacher_dim是Adaptor的参数
+        # layers=[
+        #     ['backbone.block1.1.attn.ATTN','backbone.block1.2.attn.ATTN',[256,256],3],
+        #     # ['backbone.block1.1.mlp.fc2','backbone.block1.2.mlp.fc2',[64,64],3],
+        #     ['backbone.block2.1.attn.ATTN','backbone.block2.2.attn.ATTN',[256,256],3],
+        #     # ['backbone.block2.1.mlp.fc2','backbone.block2.2.mlp.fc2',[64,128],3],
+        #     ['backbone.block3.1.attn.ATTN','backbone.block3.17.attn.ATTN',[256,256],3],
+        #     # ['backbone.block3.1.mlp.fc2','backbone.block3.17.mlp.fc2',[160,320],3],
+        #     ['backbone.block4.1.attn.ATTN','backbone.block4.2.attn.ATTN',[256,256],3],
+        #     # ['backbone.block4.1.mlp.fc2','backbone.block4.2.mlp.fc2',[256,512],3],
+        #     # ['decode_head.linear_pred','decode_head.linear_pred',[150,150],4],
+        # ],
         layers=[
-            ['backbone.block1.1.attn.ATTN','backbone.block1.2.attn.ATTN',[256,256],3],
+            ['backbone.block1.1.attn.ATTN','backbone.block1.2.attn.ATTN',[1,1],3],
             # ['backbone.block1.1.mlp.fc2','backbone.block1.2.mlp.fc2',[64,64],3],
-            ['backbone.block2.1.attn.ATTN','backbone.block2.2.attn.ATTN',[256,256],3],
+            ['backbone.block2.1.attn.ATTN','backbone.block2.2.attn.ATTN',[2,2],3],
             # ['backbone.block2.1.mlp.fc2','backbone.block2.2.mlp.fc2',[64,128],3],
-            ['backbone.block3.1.attn.ATTN','backbone.block3.17.attn.ATTN',[256,256],3],
+            ['backbone.block3.1.attn.ATTN','backbone.block3.17.attn.ATTN',[5,5],3],
             # ['backbone.block3.1.mlp.fc2','backbone.block3.17.mlp.fc2',[160,320],3],
-            ['backbone.block4.1.attn.ATTN','backbone.block4.2.attn.ATTN',[256,256],3],
+            ['backbone.block4.1.attn.ATTN','backbone.block4.2.attn.ATTN',[8,8],3],
             # ['backbone.block4.1.mlp.fc2','backbone.block4.2.mlp.fc2',[256,512],3],
             # ['decode_head.linear_pred','decode_head.linear_pred',[150,150],4],
         ],

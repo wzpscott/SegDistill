@@ -617,20 +617,26 @@ class CriterionChannelAwareLoss(nn.Module):
     def forward(self, preds, soft, mask):
         preds_S, preds_T = preds, soft
         if mask is None:
-            mask = torch.ones(preds_S.shape[0],preds_S.shape[2]).cuda()
-        if len(preds_S.shape) == 4:
-            N,C,W,H = preds_S.shape
-            preds_S = preds_S.reshape(N,C,W*H)
-            preds_T = preds_T.reshape(N,C,W*H)
-            mask = mask.reshape(N,W*H)
+            mask = 1
 
-        N, C, WH = preds_S.shape
         softmax_pred_T = F.softmax(preds_T/self.tau, dim=2)
         softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=2)
+        if len(preds_S.shape) == 4:
+            N,num_head,WH,WH_ = preds_S.shape
+            # preds_S = preds_S.reshape(N,num_head,-1)
+            # preds_T = preds_T.reshape(N,num_head,-1)
+            softmax_pred_T = F.softmax(preds_T/self.tau, dim=-1)
+            softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=-1)
+            loss = self.KL(softmax_pred_S,softmax_pred_T).sum()
+            return loss/(N*num_head*WH)
+        else:
+            N, C, WH = preds_S.shape
+            softmax_pred_T = F.softmax(preds_T/self.tau, dim=2)
+            softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=2)
 
-        loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
-        loss = (loss*mask).sum()
-        return loss/(N*C)
+            loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
+            loss = (loss*mask).sum()
+            return loss/(N*C)
 
 
 class KLdiv(nn.Module):
