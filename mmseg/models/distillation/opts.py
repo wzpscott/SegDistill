@@ -255,7 +255,7 @@ class DistillationLoss_(nn.Module):
         # add gradients to weight of each layer's loss
         self.strategy = distillation['weights_init_strategy']
         if self.strategy=='equal':
-            weights = [1/len(layers) for i in range(len(layers))]
+            weights = [self.weight for i in range(len(layers))]
             weights = nn.Parameter(torch.Tensor(weights),requires_grad=False)
             self.weights = weights
         elif self.strategy=='self_adjust':

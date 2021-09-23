@@ -631,11 +631,15 @@ class CriterionChannelAwareLoss(nn.Module):
             return loss/(N*num_head*WH)
         else:
             N, C, WH = preds_S.shape
+            mask = mask.squeeze(1)
+            preds_S *= mask
+            preds_T *= mask
             softmax_pred_T = F.softmax(preds_T/self.tau, dim=2)
             softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=2)
 
-            loss = self.KL(softmax_pred_S,softmax_pred_T).sum(dim=1)
-            loss = (loss*mask).sum()
+            r = sum(mask)/mask.flatten().shape[0]
+
+            loss = self.KL(softmax_pred_S,softmax_pred_T).sum()*r
             return loss/(N*C)
 
 
