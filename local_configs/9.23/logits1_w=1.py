@@ -12,7 +12,7 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook') 
         dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/9.23/logits2'
+work_dir = './work_dirs/9.23/logits1,w=1'
 model = dict(
     cfg=dict(
             type='EncoderDecoder',
@@ -60,7 +60,7 @@ model = dict(
         weights_init_strategy='equal',
         parse_mode='regular',
         use_attn=False,
-        logits_weights=[1,1,1,0,0], # [bg_mask,SrTr_mask,SfTr_mask,SfTf_mask,SrTf_mask]
+        logits_weights=[1,1,1,1,1], # [bg_mask,SrTr_mask,SfTr_mask,SfTf_mask,SrTf_mask]
         T=4,weight=1,loss_func ='ca'
     ),
     s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
