@@ -675,11 +675,10 @@ class CriterionChannelAwareLossGroup(nn.Module):
         self.tau = tau
         self.KL = torch.nn.KLDivLoss(reduction='none')
 
-    def forward(self, preds, soft, mask, G=4):
+    def forward(self, preds, soft, mask, G=5):
         preds_S, preds_T = preds, soft
         if mask is None:
             mask = torch.ones(preds_S.shape[0],preds_S.shape[2]).cuda()
-        attn_weight = 0.2 if len(preds_S.shape) == 4 else 1
         if len(preds_S.shape) == 4:
             N,C,W,H = preds_S.shape
             preds_S = preds_S.reshape(N,C,W*H)
@@ -695,7 +694,22 @@ class CriterionChannelAwareLossGroup(nn.Module):
         softmax_pred_T = F.softmax(preds_T/self.tau, dim=2)
         softmax_pred_S = F.log_softmax(preds_S/self.tau, dim=2)
 
-        loss = self.KL(softmax_pred_S,softmax_pred_T).sum()*attn_weight
+        loss = self.KL(softmax_pred_S,softmax_pred_T).sum()
 
-        return loss/(N*C)
+        return loss/(N*C)*G
 
+class SaLoss(nn.Module):
+    def __init__(self, tau=1.0):
+        super().__init__()
+        self.tau = tau
+        self.KL = KLdiv(tau)
+        self.CA =CriterionChannelAwareLoss(tau)
+        weights = nn.Parameter(torch.Tensor([2.71 for i in range(2)]),requires_grad=True)
+        torch.nn.init.uniform_(weights,1,2)
+        self.weights = weights
+
+    def forward(self, preds, soft, mask):
+        ca_loss = self.CA(preds, soft, mask)
+        kl_loss = self.KL(preds, soft, mask)
+        loss =  (1 / (self.weights[0] ** 2)) *ca_loss + (1 / (self.weights[1] ** 2)) *kl_loss + torch.log(self.weights[0]) + torch.log(self.weights[1])
+        return loss

@@ -229,6 +229,8 @@ class DistillationLoss_(nn.Module):
             self.kd_loss = CriterionChannelAwareLoss(self.T)
         elif distillation['loss_func'] == 'group':
             self.kd_loss = CriterionChannelAwareLossGroup(self.T)
+        elif distillation['loss_func'] == 'sa':
+            self.kd_loss = SaLoss(self.T)
         
         self.logits_weights = distillation['logits_weights']
         self.adaptors = nn.ModuleList()
@@ -281,9 +283,9 @@ class DistillationLoss_(nn.Module):
                 loss = self.weights[i] * self.kd_loss(pred[i], soft[i], mask)
                 name = self.layers[i]
                 losses.update({'loss_' + name: loss})
-                if 'pred' in name:
-                    decode_loss = (losses['decode.loss_seg']*mask).mean()
-                    losses.update({'decode.loss_seg': decode_loss})
+                # if 'pred' in name:
+                #     decode_loss = (losses['decode.loss_seg']*mask).mean()
+                #     losses.update({'decode.loss_seg': decode_loss})
             elif self.strategy == 'self_adjust':
                 loss = (1 / (self.weights[0] ** 2)) * \
                         self.kd_loss(pred[i], soft[i]) \
