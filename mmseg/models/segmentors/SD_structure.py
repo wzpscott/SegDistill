@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
-from mmseg.models.distillation.opts import Extractor,DistillationLoss_
+from mmseg.models.distillation.opts import Extractor,DistillationLoss
 from mmseg.core import add_prefix
 from mmseg.ops import resize
 from .. import builder
@@ -12,20 +12,18 @@ from collections import OrderedDict
 import numpy as np
 import random
 import copy
+from ..distillation.losses import *
+
 
 @SEGMENTORS.register_module()
-class SDModule_(BaseSegmentor):
+class SDModule(BaseSegmentor):
     def __init__(self,
-                 cfg, cfg_t,train_cfg,test_cfg,distillation,s_pretrain,t_pretrain):
-        super(SDModule_, self).__init__()
-        self.cfg_s = cfg
+                 cfg_s, cfg_t,train_cfg,test_cfg,distillation,s_pretrain,t_pretrain):
+        super().__init__()
+        self.cfg_s = cfg_s
         self.cfg_t = cfg_t
         self.distillation = distillation
-        if len(distillation.layers) == 0:
-            self.use_teacher = False
-        else:
-            self.use_teacher = True
-            
+
         self.teacher = builder.build_segmentor(
             cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
         self.teacher.load_state_dict(torch.load(
@@ -35,94 +33,31 @@ class SDModule_(BaseSegmentor):
             param.requires_grad = False
 
         self.student = builder.build_segmentor(
-            cfg, train_cfg=train_cfg, test_cfg=test_cfg)
-        self.student_init(strategy='use_pretrain',s_pretrain=s_pretrain,t_pretrain=t_pretrain)
-        if self.use_teacher:
-            self.features = Extractor(self.student,self.teacher,distillation.layers)
-            self.loss = DistillationLoss_(distillation = distillation,tau=1)
+            cfg_s, train_cfg=train_cfg, test_cfg=test_cfg)
+        # 载入student的权重
+        # 预训练模型的层名称没有‘backbone.’ 的前缀，因此在载入前需要增加前缀
+        state_dict = torch.load(s_pretrain)
+        new_keys = ['backbone.'+key for key in state_dict]
+        d1 = dict( zip( list(state_dict.keys()), new_keys) )
+        new_state_dict = {d1[oldK]: value for oldK, value in state_dict.items()}
+        self.student.load_state_dict(new_state_dict,strict=False)
+
+        self.extractor = Extractor(self.student,self.teacher,self.distillation)
+        self.distillation_loss = DistillationLoss(self.distillation)
+
         self.align_corners = False
         self.test_mode = 'whole'
 
     def forward_train(self, img, img_metas, gt_semantic_seg):
         loss_dict = self.student(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
-
-        if self.use_teacher:
-            with torch.no_grad():
-                _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
+        with torch.no_grad():
+            _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
             del _
+        student_features,teacher_features = self.extractor.student_features,self.extractor.teacher_features
+        distillation_loss_dict = self.distillation_loss(student_features,teacher_features)
 
-            softs_fea = []
-            preds_fea = []
-
-            for i in range(len(self.features.teacher_features)):
-                pred = self.features.student_features[i]
-                soft = self.features.teacher_features[i]
-                softs_fea.append(soft)
-                preds_fea.append(pred)
-            loss_dict = self.loss(softs_fea, preds_fea, loss_dict,gt_semantic_seg)
-        
-            self.features.student_features = []
-            self.features.teacher_features = []
+        loss_dict.update(distillation_loss_dict)
         return loss_dict
-    
-    def student_init(self,strategy,s_pretrain=None,t_pretrain=None,distillation=None):
-        if strategy == 'use_pretrain':# 使用预训练模型
-            # 载入student的权重
-            # 预训练模型的层名称没有‘backbone.’ 的前缀，因此在载入前需要增加前缀
-            state_dict = torch.load(s_pretrain)
-            new_keys = ['backbone.'+key for key in state_dict]
-            d1 = dict( zip( list(state_dict.keys()), new_keys) )
-            new_state_dict = {d1[oldK]: value for oldK, value in state_dict.items()}
-            self.student.load_state_dict(new_state_dict,strict=False)
-            
-        elif strategy == 'use_teacher' :# 跳层初始化
-            assert self.cfg_s['backbone']['embed_dim'] == self.cfg_t['backbone']['embed_dim']  # 需要维度一致
-
-            state_dict = torch.load(t_pretrain)['state_dict']  # 载入teacher模型
-            # student 和 teacher对应: 0->0 1->3 2->6 3->10 4->14 5->17
-            mapping = {0:0,1:3,2:6,3:10,4:14,5:17}
-            new_state_dict = OrderedDict()
-            # print([k for k,v in state_dict.items()])
-            for k,v in state_dict.items():
-                if not k.startswith('backbone.layers.2'):
-                    new_state_dict[k] = v
-                elif str(k.split('.')[4]) in mapping.keys():
-                    new_k = k.split('.')
-                    new_k[4] = mapping[new_k[4]]
-                    new_k = ''.join(new_k)
-
-                    new_state_dict[new_k] = v
-                    
-            self.student.load_state_dict(new_state_dict,strict=False)
-        else:
-            raise ValueError('Wrong student init strategy')
-
-    # def _parse_losses(self,losses):
-    #     log_vars = OrderedDict()
-    #     for loss_name, loss_value in losses.items():
-    #         if isinstance(loss_value, torch.Tensor):
-    #             log_vars[loss_name] = loss_value.mean()
-    #         elif isinstance(loss_value, list):
-    #             log_vars[loss_name] = sum(_loss.mean() for _loss in loss_value)
-    #         else:
-    #             raise TypeError(
-    #                 f'{loss_name} is not a tensor or list of tensors')
-        
-    #     return log_vars,self.distillation.parse_mode
-
-    # def train_step(self, data_batch, optimizer, loss_name='all',backward=True, **kwargs):
-    #     losses = self(**data_batch)
-    #     log_vars,parse_mode = self._parse_losses(losses)
-
-    #     outputs = dict(
-    #         log_vars=log_vars,
-    #         parse_mode=parse_mode,
-    #         num_samples=len(data_batch['img'].data))
-
-    #     loss = sum(_value for _key, _value in losses.items()
-    #                         if 'loss' in _key)
-    #     outputs['loss'] = loss
-    #     return outputs
 
     def slide_inference(self, img, img_meta, rescale):
         """Inference by sliding-window with overlap."""
@@ -194,7 +129,6 @@ class SDModule_(BaseSegmentor):
         """
 
         assert self.test_mode in ['slide', 'whole']
-        # img_meta = img_meta.data[0]
         ori_shape = img_meta[0]['ori_shape']
         assert all(_['ori_shape'] == ori_shape for _ in img_meta)
         if self.test_mode == 'slide':
@@ -258,3 +192,6 @@ class SDModule_(BaseSegmentor):
         # unravel batch dim
         seg_pred = list(seg_pred)
         return seg_pred
+
+
+    
