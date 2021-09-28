@@ -9,7 +9,7 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook') 
         dict(type='TextLoggerHook')
     ])
-work_dir = './work_dirs/logits_cg3'
+work_dir = './work_dirs/logits_sg'
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 
@@ -52,19 +52,11 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
-        # a list of dicts containing layer information you want to apply distillation .
-        #     a dict contains:
-        #     student_layer: the name of student layer
-        #     teacher_layer: the name of teacher layer
-        #     loss_name: the name of loss function you want to apply to the ouputs of those two layers.
-        #     loss_config: a dict containing config for the loss function(weight, temperature for SoftMax etc)
-        #     channel_nums: a tuple of (student_channel_num,teacher_channel_num). optional
-        #                 If specified, using a 1x1 conv layer to upsample student layer's channel num 
-        #                 when student layer and teacher layer 's outputs have different channel shapes
-        {'student_layer':'decode_head.linear_pred','teacher_layer':'decode_head.linear_pred',
-        'loss_name':'ChannelGroupLoss',
-        'loss_config':{'weight':1,'tau':1,'group_num':3},
-        },
+        {'student_layer':'decode_head.linear_pred',
+        'teacher_layer':'decode_head.linear_pred',
+        'loss_name':'SpatialGroupLoss',
+        'loss_config':{'weight':1,'tau':1,'kernel_size':16, 'dilation':1, 'padding':0, 'stride':8},
+        'inspect_mode':True},
     ],
     s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',  # 老师的预训练模型

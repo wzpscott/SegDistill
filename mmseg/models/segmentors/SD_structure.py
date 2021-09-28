@@ -54,7 +54,7 @@ class SDModule(BaseSegmentor):
             _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
             del _
         student_features,teacher_features = self.extractor.student_features,self.extractor.teacher_features
-        distillation_loss_dict = self.distillation_loss(student_features,teacher_features)
+        distillation_loss_dict = self.distillation_loss(student_features,teacher_features,gt_semantic_seg)
 
         loss_dict.update(distillation_loss_dict)
         return loss_dict
