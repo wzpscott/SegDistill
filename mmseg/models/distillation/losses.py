@@ -157,3 +157,10 @@ class ChannelWiseLossFeature(Baseloss):
     def transform(self,x,gt_semantic_seg):
         x = x.permute(0,2,1)
         return x
+
+class SpatialLossFeature(Baseloss):
+    def __init__(self,weight,tau,softmax_dim=-1):
+        super().__init__(weight,tau,softmax_dim = -1)
+    def transform(self,x,gt_semantic_seg):
+        # x = x.permute(0,2,1)
+        return x
