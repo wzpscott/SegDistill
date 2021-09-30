@@ -77,10 +77,11 @@ class DistillationLoss(nn.Module):
             criterion = self.distillation[i]['criterion']
             loss = criterion(x_student, x_teacher,gt_semantic_seg)
 
-            if 'inspect_mode' in self.distillation[i]:
-                loss = loss.detach()
-
-            distillation_losses[f'loss_{student_layer}<->{teacher_layer}'] = loss
+            loss_name = f'loss_{student_layer}<->{teacher_layer}'
+            if loss_name in distillation_losses:
+                distillation_losses[loss_name] += loss
+            else:
+                distillation_losses[loss_name] = loss
 
         return distillation_losses
 

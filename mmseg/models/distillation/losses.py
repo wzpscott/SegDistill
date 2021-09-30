@@ -6,7 +6,15 @@ import numpy as np
 from torch.nn import functional as F
 from mmseg.ops import resize
 
-
+class MSELoss(nn.Module):
+    def __init__(self,weight):
+        super().__init__()
+        self.weight = weight
+        self.MSE = nn.MSELoss()
+    def forward(self,x_student,x_teacher,gt_semantic_seg):
+        loss = self.weight * self.MSE(x_student,x_teacher)
+        return loss
+        
 class Baseloss(nn.Module):
     '''
     Other losses can inherit Baseloss class and rewrite the tranform function to get desirable output shape.
@@ -46,6 +54,33 @@ class ChannelWiseLoss(Baseloss):
         B,C,W,H = x.shape
         x = x.reshape(B,C,W*H)
         return x
+
+class ChannelWiseLossWithMask(Baseloss):
+    def __init__(self,weight,tau):
+        super().__init__(weight,tau)
+    def transform(self,x,gt_semantic_seg):
+        x = self.resize(x,gt_semantic_seg)
+        B,C,W,H = x.shape
+        x = x.reshape(B,C,W*H)
+        return x
+    def forward(self,x_student,x_teacher,gt_semantic_seg):
+        x_student,x_teacher = self.transform(x_student,gt_semantic_seg),self.transform(x_teacher,gt_semantic_seg)
+        teacher_pd = torch.argmax(x_teacher,dim=1,keepdim=True)
+
+        gt_semantic_seg = gt_semantic_seg.reshape(gt_semantic_seg.shape[0],1,-1)
+
+        mask_tm = (teacher_pd != gt_semantic_seg).bool() # teacher mistakes
+        mask_bg = (gt_semantic_seg == 255).bool() # background (255)
+        mask = (mask_bg & mask_tm).expand(-1,150,-1)
+
+        x_student[mask] = -1e9
+        x_teacher[mask] = -1e9
+
+        x_student = F.log_softmax(x_student/self.tau,dim=self.softmax_dim)
+        x_teacher = F.softmax(x_teacher/self.tau,dim=self.softmax_dim)
+        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        return loss/(x_student.numel()/x_student.shape[-1])
+
 
 class SpatialWiseLoss(Baseloss):
     # 'Apply softmax spatial wise'
