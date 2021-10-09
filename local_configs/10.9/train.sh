@@ -1,0 +1,14 @@
+bash tools/dist_train.sh local_configs/10.9/attention_stage1.py 8;
+sleep 10;
+bash tools/dist_train.sh local_configs/10.9/attention_stage2.py 8;
+sleep 10;
+bash tools/dist_train.sh local_configs/10.9/attention_stage3.py 8;
+sleep 10;
+bash tools/dist_train.sh local_configs/10.9/attention_stage4.py 8;
+sleep 10;
+bash tools/dist_train.sh local_configs/10.9/baseline.py 8;
+sleep 10;
+bash tools/dist_train.sh local_configs/10.9/logits_cg1.py 8;
+sleep 10;
+bash tools/dist_train.sh local_configs/10.9/logits_cg3_noResize_ff.py 8;
+sleep 10;
