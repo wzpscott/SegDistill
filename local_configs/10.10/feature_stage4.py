@@ -46,8 +46,8 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
-        {'student_layer':'backbone.block4.1.attn.ATTN',
-        'teacher_layer':'backbone.block4.2.attn.ATTN',
+        {'student_layer':'backbone.block4.1.mlp.fc2',
+        'teacher_layer':'backbone.block4.2.mlp.fc2',
         'loss_name':'KLDLoss',
         'loss_config':{
             'weight':1,

@@ -47,7 +47,7 @@ model = dict(
     ),
     distillation = [
         {'student_layer':'backbone.block3.1.mlp.fc2',
-        'teacher_layer':'backbone.block3.17.attn.ATTN',
+        'teacher_layer':'backbone.block3.17.mlp.fc2',
         'loss_name':'KLDLoss',
         'loss_config':{
             'weight':1,
