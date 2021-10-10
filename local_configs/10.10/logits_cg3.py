@@ -3,35 +3,29 @@ _base_ = [
     '../_base_/default_runtime.py',
     '../_base_/schedules/schedule_160k.py'
 ]
-log_config = dict(  
-    interval=50, 
-    hooks=[
-        # dict(type='TensorboardLoggerHook') 
-        dict(type='TextLoggerHook')
-    ])
-work_dir = './work_dirs/attention_stage1'
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 
 model = dict(
     type='SDModule',
     cfg_s=dict(
-            type='EncoderDecoder',
-            backbone=dict(
-                type='mit_b0',
-                style='pytorch'),
-            decode_head=dict(
-                type='SegFormerHead',
-                in_channels=[32, 64, 160, 256],
-                in_index=[0, 1, 2, 3],
-                feature_strides=[4, 8, 16, 32],
-                channels=128,
-                dropout_ratio=0.1,
-                num_classes=150,
-                norm_cfg=norm_cfg,
-                align_corners=False,
-                decoder_params=dict(embed_dim=256),
-                loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
+        type='EncoderDecoder',
+        pretrained='pretrained/mit_b0.pth',
+        backbone=dict(
+            type='mit_b0',
+            style='pytorch'),
+        decode_head=dict(
+            type='SegFormerHead',
+            in_channels=[32, 64, 160, 256],
+            in_index=[0, 1, 2, 3],
+            feature_strides=[4, 8, 16, 32],
+            channels=128,
+            dropout_ratio=0.1,
+            num_classes=150,
+            norm_cfg=norm_cfg,
+            align_corners=False,
+            decoder_params=dict(embed_dim=256),
+            loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
         ),
     cfg_t=dict(
         type='EncoderDecoder',
@@ -52,12 +46,19 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
-        {'student_layer':'backbone.block1.1.attn.ATTN',
-        'teacher_layer':'backbone.block1.2.attn.ATTN',
-        'loss_name':'SpatialGroupLossForAttention',
-        'loss_config':{'weight':0.4,'tau':1,'kernel_size':1, 'dilation':1, 'padding':0,'stride':1,
-                        'ff':{'c_in':256,'c_out':256,'dim':-1}},
-        }
+        {'student_layer':'decode_head.linear_pred',
+        'teacher_layer':'decode_head.linear_pred',
+        'loss_name':'KLDLoss',
+        'loss_config':{
+            'weight':1,
+            'tau':1,
+            'reshape_config':'logits',
+            'resize_config':{'mode':'bilinear','align_corners':False},
+            'mask_config':False,
+            'transform_config':{'loss_type':'channel','group_size':3},
+            'ff_config':{'in_channels':150, 'out_channels':150, 'kernel_size':1}
+            },
+        },
     ],
     s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',  # 老师的预训练模型
@@ -76,6 +77,14 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
+log_config = dict(  
+    interval=50, 
+    hooks=[
+        # dict(type='TensorboardLoggerHook') 
+        dict(type='TextLoggerHook')
+    ])
+work_dir = '/apdcephfs/private_inchzhang/shared_info/cg3'
+
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  
-# resume_from = './work_dirs/20/attn/latest.pth'
+# resume_from = ''

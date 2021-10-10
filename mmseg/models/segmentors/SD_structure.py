@@ -34,13 +34,6 @@ class SDModule(BaseSegmentor):
 
         self.student = builder.build_segmentor(
             cfg_s, train_cfg=train_cfg, test_cfg=test_cfg)
-        # 载入student的权重
-        # 预训练模型的层名称没有‘backbone.’ 的前缀，因此在载入前需要增加前缀
-        state_dict = torch.load(s_pretrain)
-        new_keys = ['backbone.'+key for key in state_dict]
-        d1 = dict( zip( list(state_dict.keys()), new_keys) )
-        new_state_dict = {d1[oldK]: value for oldK, value in state_dict.items()}
-        self.student.load_state_dict(new_state_dict,strict=False)
 
         self.extractor = Extractor(self.student,self.teacher,self.distillation)
         self.distillation_loss = DistillationLoss(self.distillation)

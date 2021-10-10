@@ -61,18 +61,12 @@ class DistillationLoss(nn.Module):
             criterion = eval(loss_name)(**loss_config) 
             distillation[i]['criterion'] = criterion
 
-            if 'channel_nums' in distillation[i]:
-                student_channel_num,teacher_channel_num = distillation[i]['channel_nums']
-                distillation[i]['upsampler'] = Conv1d(student_channel_num,teacher_channel_num,kernel_size=1,dim=2).cuda()
-
         self.distillation = distillation
     def forward(self,student_features,teacher_features,gt_semantic_seg):
         distillation_losses = {}
         for i in range(len(self.distillation)):
             student_layer, teacher_layer = self.distillation[i]['student_layer'], self.distillation[i]['teacher_layer']
             x_student, x_teacher = student_features[student_layer], teacher_features[teacher_layer]
-            if 'upsampler' in self.distillation[i]:
-                x_student = self.distillation[i]['upsampler'](x_student)
 
             criterion = self.distillation[i]['criterion']
             loss = criterion(x_student, x_teacher,gt_semantic_seg)
