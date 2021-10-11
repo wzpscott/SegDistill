@@ -24,22 +24,23 @@ class SDModule(BaseSegmentor):
         self.cfg_t = cfg_t
         self.distillation = distillation
 
+        self.student = builder.build_segmentor(
+            cfg_s, train_cfg=train_cfg, test_cfg=test_cfg)
+
         self.teacher = builder.build_segmentor(
-            cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
+                    cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
         self.teacher.load_state_dict(torch.load(
-            t_pretrain)['state_dict'],strict=True)
+                t_pretrain)['state_dict'],strict=True)
         self.teacher.eval()
         for param in self.teacher.parameters():
             param.requires_grad = False
-
-        self.student = builder.build_segmentor(
-            cfg_s, train_cfg=train_cfg, test_cfg=test_cfg)
 
         self.extractor = Extractor(self.student,self.teacher,self.distillation)
         self.distillation_loss = DistillationLoss(self.distillation)
 
         self.align_corners = False
         self.test_mode = 'whole'
+
 
     def forward_train(self, img, img_metas, gt_semantic_seg):
         loss_dict = self.student(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
@@ -52,8 +53,13 @@ class SDModule(BaseSegmentor):
         loss_dict.update(distillation_loss_dict)
         return loss_dict
 
+
     def slide_inference(self, img, img_meta, rescale):
-        """Inference by sliding-window with overlap."""
+        """Inference by sliding-window with overlap.
+
+        If h_crop > h_img or w_crop > w_img, the small patch will be used to
+        decode without padding.
+        """
 
         h_stride, w_stride = self.test_cfg.stride
         h_crop, w_crop = self.test_cfg.crop_size
@@ -72,14 +78,17 @@ class SDModule(BaseSegmentor):
                 y1 = max(y2 - h_crop, 0)
                 x1 = max(x2 - w_crop, 0)
                 crop_img = img[:, :, y1:y2, x1:x2]
-                pad_img = crop_img.new_zeros(
-                    (crop_img.size(0), crop_img.size(1), h_crop, w_crop))
-                pad_img[:, :, :y2 - y1, :x2 - x1] = crop_img
-                pad_seg_logit = self.s_net.encode_decode(pad_img, img_meta)
-                preds[:, :, y1:y2,
-                x1:x2] += pad_seg_logit[:, :, :y2 - y1, :x2 - x1]
+                crop_seg_logit = self.encode_decode(crop_img, img_meta)
+                preds += F.pad(crop_seg_logit,
+                               (int(x1), int(preds.shape[3] - x2), int(y1),
+                                int(preds.shape[2] - y2)))
+
                 count_mat[:, :, y1:y2, x1:x2] += 1
         assert (count_mat == 0).sum() == 0
+        if torch.onnx.is_in_onnx_export():
+            # cast count_mat to constant while exporting to ONNX
+            count_mat = torch.from_numpy(
+                count_mat.cpu().detach().numpy()).to(device=img.device)
         preds = preds / count_mat
         if rescale:
             preds = resize(
@@ -88,13 +97,12 @@ class SDModule(BaseSegmentor):
                 mode='bilinear',
                 align_corners=self.align_corners,
                 warning=False)
-
         return preds
 
     def whole_inference(self, img, img_meta, rescale):
         """Inference with full image."""
 
-        seg_logit = self.student.encode_decode(img, img_meta)
+        seg_logit = self.encode_decode(img, img_meta)
         if rescale:
             seg_logit = resize(
                 seg_logit,
@@ -121,22 +129,22 @@ class SDModule(BaseSegmentor):
             Tensor: The output segmentation map.
         """
 
-        assert self.test_mode in ['slide', 'whole']
+        assert self.test_cfg.mode in ['slide', 'whole']
         ori_shape = img_meta[0]['ori_shape']
         assert all(_['ori_shape'] == ori_shape for _ in img_meta)
-        if self.test_mode == 'slide':
+        if self.test_cfg.mode == 'slide':
             seg_logit = self.slide_inference(img, img_meta, rescale)
         else:
             seg_logit = self.whole_inference(img, img_meta, rescale)
         output = F.softmax(seg_logit, dim=1)
         flip = img_meta[0]['flip']
-        flip_direction = img_meta[0]['flip_direction']
         if flip:
+            flip_direction = img_meta[0]['flip_direction']
             assert flip_direction in ['horizontal', 'vertical']
             if flip_direction == 'horizontal':
-                output = output.flip(dims=(3,))
+                output = output.flip(dims=(3, ))
             elif flip_direction == 'vertical':
-                output = output.flip(dims=(2,))
+                output = output.flip(dims=(2, ))
 
         return output
 
@@ -144,30 +152,16 @@ class SDModule(BaseSegmentor):
         """Simple test with single image."""
         seg_logit = self.inference(img, img_meta, rescale)
         seg_pred = seg_logit.argmax(dim=1)
+        if torch.onnx.is_in_onnx_export():
+            # our inference backend only support 4D output
+            seg_pred = seg_pred.unsqueeze(0)
+            return seg_pred
         seg_pred = seg_pred.cpu().numpy()
         # unravel batch dim
         seg_pred = list(seg_pred)
         return seg_pred
 
     def aug_test(self, imgs, img_metas, rescale=True):
-        """Test with augmentations.
-
-        Only rescale=True is supported.
-        """
-        # aug_test rescale all imgs back to ori_shape for now
-        assert rescale
-        # to save memory, we get augmented seg logit inplace
-        seg_logit = self.inference(imgs[0], img_metas[0], rescale)
-        for i in range(1, len(imgs)):
-            cur_seg_logit = self.inference(imgs[i], img_metas[i], rescale)
-            seg_logit += cur_seg_logit
-        seg_logit /= len(imgs)
-        seg_pred = seg_logit.argmax(dim=1)
-        seg_pred = seg_pred.cpu().numpy()
-        # unravel batch dim
-        seg_pred = list(seg_pred)
-        return seg_pred
-
         """Test with augmentations.
 
         Only rescale=True is supported.

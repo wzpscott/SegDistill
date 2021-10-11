@@ -71,11 +71,9 @@ class DistillationLoss(nn.Module):
             criterion = self.distillation[i]['criterion']
             loss = criterion(x_student, x_teacher,gt_semantic_seg)
 
-            loss_name = f'loss_{student_layer}<->{teacher_layer}'
-            if loss_name in distillation_losses:
-                distillation_losses[loss_name] += loss
-            else:
-                distillation_losses[loss_name] = loss
+            loss_info = self.distillation[i]['loss_config']['transform_config']['loss_type']
+            loss_name = f'loss_{student_layer}<->{teacher_layer}_{loss_info}'
+            distillation_losses[loss_name] = loss
 
         return distillation_losses
 
