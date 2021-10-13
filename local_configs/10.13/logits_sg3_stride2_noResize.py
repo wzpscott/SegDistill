@@ -3,8 +3,9 @@ _base_ = [
     '../_base_/default_runtime.py',
     '../_base_/schedules/schedule_160k_adamw.py'
 ]
+
 norm_cfg = dict(type='SyncBN', requires_grad=True)
-find_unused_parameters = True
+
 model = dict(
     type='SDModule',
     cfg_s=dict(
@@ -45,6 +46,19 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
+        {'student_layer':'decode_head.linear_pred',
+        'teacher_layer':'decode_head.linear_pred',
+        'loss_name':'KLDLoss',
+        'loss_config':{
+            'weight':1,
+            'tau':1,
+            'reshape_config':'logits',
+            'resize_config':False,
+            'mask_config':False,
+            'transform_config':{'loss_type':'spatial','kernel_size':3,'stride':2},
+            'ff_config':False
+            },
+        },
     ],
     s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',  # 老师的预训练模型
@@ -63,15 +77,7 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-log_config = dict(  
-    interval=50, 
-    hooks=[
-        # dict(type='TensorboardLoggerHook') 
-        dict(type='TextLoggerHook')
-    ])
-# work_dir = '/apdcephfs/private_inchzhang/shared_info/baseline'
-
+work_dir = '/apdcephfs/private_inchzhang/shared_info/10.13/logits_sg3_stride2_noResize'
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  
 # resume_from = ''
-

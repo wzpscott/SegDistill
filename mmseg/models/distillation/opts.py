@@ -62,16 +62,19 @@ class DistillationLoss(nn.Module):
             distillation[i]['criterion'] = criterion
 
         self.distillation = distillation
-    def forward(self,student_features,teacher_features,gt_semantic_seg):
+    def forward(self,student_features,teacher_features,gt_semantic_seg,step):
         distillation_losses = {}
         for i in range(len(self.distillation)):
             student_layer, teacher_layer = self.distillation[i]['student_layer'], self.distillation[i]['teacher_layer']
             x_student, x_teacher = student_features[student_layer], teacher_features[teacher_layer]
 
             criterion = self.distillation[i]['criterion']
-            loss = criterion(x_student, x_teacher,gt_semantic_seg)
+            loss = criterion(x_student, x_teacher,gt_semantic_seg,step)
 
-            loss_info = self.distillation[i]['loss_config']['transform_config']['loss_type']
+            try:
+                loss_info = self.distillation[i]['loss_config']['transform_config']
+            except:
+                loss_info = 'other'
             loss_name = f'loss_{student_layer}<->{teacher_layer}_{loss_info}'
             distillation_losses[loss_name] = loss
 

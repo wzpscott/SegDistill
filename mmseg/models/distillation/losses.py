@@ -91,7 +91,7 @@ class KLDLoss(nn.Module):
             x = x.transpose(2,1)
         return x
 
-    def forward(self,x_student,x_teacher,gt_semantic_seg):
+    def forward(self,x_student,x_teacher,gt_semantic_seg,step):
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
             x_student = self._ff(x_student)
@@ -108,24 +108,74 @@ class KLDLoss(nn.Module):
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
 
-# class ChannelGroupLossForLogits(KLDLoss):
-#     def __init__(self,group_size,resize_config,mask_config,transform_config,ff_config):
-#         self.reshape_config = 'Logits'
+class TwoStageChannelGroup(KLDLoss):
+    def __init__(self):
+        weight = 1
+        tau = 1
 
-#         if resize_config:
-#             self.resize_config = {'mode':'bilinear','align_corners':False}
-#             self.resize_config.update(resize_config)
-#         if mask_config:
-#             self.mask_config = {'masks':['mask_tm']}
-#             self.mask_config.update(mask_config)
-#         if transform_config:
-#             self.transform_config = {'loss_type':'channel','group_size':3}
-#             self.transform_config.update(transform_config)
-#         if ff_config:
-#             self.ff_config = {'in_channels':150, 'out_channels':150, 'kernel_size':1}
-#             self.ff_config.update(ff_config)
+        reshape_config = 'logits'
+        resize_config = {'mode':'bilinear','align_corners':False}
+        mask_config = False
+        transform_config = {'loss_type':'channel'}
 
-#         super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config)
+        ff_config = False
 
+        super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config)
+    def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if step < 96000:
+            self.transform_config['group_size'] = 3
+        else:
+            self.transform_config['group_size'] = 1
+        
+        x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
+        if self.ff :
+            x_student = self._ff(x_student)
+        if self.resize_config:
+            x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
+        if self.mask_config:
+            x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
+        if self.transform_config:
+            x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
+        
+        x_student = F.log_softmax(x_student/self.tau,dim=-1)
+        x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
+        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        loss = loss/(x_student.numel()/x_student.shape[-1])
+        return loss
 
-# class SpatialGroupLossForLogits()
+class ThreeStageChannelGroup(KLDLoss):
+    def __init__(self):
+        weight = 1
+        tau = 1
+
+        reshape_config = 'logits'
+        resize_config = {'mode':'bilinear','align_corners':False}
+        mask_config = False
+        transform_config = {'loss_type':'channel'}
+
+        ff_config = False
+
+        super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config)
+    def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if step < 96000:
+            self.transform_config['group_size'] = 3
+        elif step < 144000:
+            self.transform_config['group_size'] = 1
+        else:
+            self.weight = 0
+        
+        x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
+        if self.ff :
+            x_student = self._ff(x_student)
+        if self.resize_config:
+            x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
+        if self.mask_config:
+            x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
+        if self.transform_config:
+            x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
+        
+        x_student = F.log_softmax(x_student/self.tau,dim=-1)
+        x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
+        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        loss = loss/(x_student.numel()/x_student.shape[-1])
+        return loss

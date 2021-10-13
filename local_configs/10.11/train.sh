@@ -1,4 +1,4 @@
-bash tools/dist_train.sh local_configs/10.10/baseline.py 8;
+bash tools/dist_train.sh local_configs/10.11/baseline.py 8;
 
 bash tools/dist_train.sh local_configs/10.10/logits_c.py 8;
 bash tools/dist_train.sh local_configs/10.10/logits_s.py 8;
