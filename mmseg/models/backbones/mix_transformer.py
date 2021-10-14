@@ -75,6 +75,9 @@ class Attention(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
 
         self.ATTN = Hook()
+        self.Q = Hook()
+        self.K = Hook()
+        self.V = Hook()
 
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
@@ -104,6 +107,7 @@ class Attention(nn.Module):
     def forward(self, x, H, W):
         B, N, C = x.shape
         q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+        q = self.Q(q)
 
         if self.sr_ratio > 1:
             x_ = x.permute(0, 2, 1).reshape(B, C, H, W)
@@ -113,6 +117,8 @@ class Attention(nn.Module):
         else:
             kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         k, v = kv[0], kv[1] # [B,num_head,WH',C/num_head]
+
+        k,v = self.K(k),self.V(v)
 
         attn = (q @ k.transpose(-2, -1)) * self.scale # [B,num_head,WH,WH']
         attn = self.ATTN(attn)

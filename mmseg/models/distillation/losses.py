@@ -8,7 +8,9 @@ from mmseg.ops import resize
 
 
 class KLDLoss(nn.Module):
-    def __init__(self,weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config):
+    def __init__(self,weight,tau,\
+        reshape_config,resize_config,mask_config,transform_config,ff_config,\
+        earlystop_config=None):
         super().__init__()
         self.weight = weight
         self.tau = tau
@@ -18,6 +20,8 @@ class KLDLoss(nn.Module):
         self.resize_config = resize_config
         self.mask_config = mask_config
         self.transform_config = transform_config
+
+        self.earlystop_config = earlystop_config if earlystop_config else False
 
         self.ff = nn.Conv2d(**ff_config).cuda() if ff_config else False
 
@@ -92,6 +96,9 @@ class KLDLoss(nn.Module):
         return x
 
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
             x_student = self._ff(x_student)
@@ -108,25 +115,22 @@ class KLDLoss(nn.Module):
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
 
-class TwoStageChannelGroup(KLDLoss):
-    def __init__(self):
-        weight = 1
-        tau = 1
-
-        reshape_config = 'logits'
-        resize_config = {'mode':'bilinear','align_corners':False}
-        mask_config = False
-        transform_config = {'loss_type':'channel'}
-
-        ff_config = False
-
-        super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config)
+class ShiftChannelLoss(KLDLoss):
+    def __init__(self,weight,tau,\
+        reshape_config,resize_config,mask_config,transform_config,ff_config,\
+        earlystop_config=None):
+        super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
+    def _shift(self,x,step):
+        B,C,W,H = x.shape
+        stride = step % C
+        x1 = x[:,:stride,:,:]
+        x2 = x[:,stride:,:,:]
+        x = torch.cat([x2,x1],dim=1).contiguous()
+        return x
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
-        if step < 96000:
-            self.transform_config['group_size'] = 3
-        else:
-            self.transform_config['group_size'] = 1
-        
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
             x_student = self._ff(x_student)
@@ -134,6 +138,7 @@ class TwoStageChannelGroup(KLDLoss):
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
             x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
+        x_student,x_teacher = self._shift(x_student,step),self._shift(x_teacher,step)
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
         
@@ -143,27 +148,20 @@ class TwoStageChannelGroup(KLDLoss):
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
 
-class ThreeStageChannelGroup(KLDLoss):
-    def __init__(self):
-        weight = 1
-        tau = 1
-
-        reshape_config = 'logits'
-        resize_config = {'mode':'bilinear','align_corners':False}
-        mask_config = False
-        transform_config = {'loss_type':'channel'}
-
-        ff_config = False
-
-        super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config)
+class ShuffleChannelLoss(KLDLoss):
+    def __init__(self,weight,tau,\
+        reshape_config,resize_config,mask_config,transform_config,ff_config,\
+        earlystop_config=None):
+        super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
+    def _shuffle(self,x,step):
+        B,C,W,H = x.shape
+        idx = torch.randperm(C)
+        x = x[:,idx,:,:].contiguous()
+        return x
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
-        if step < 96000:
-            self.transform_config['group_size'] = 3
-        elif step < 144000:
-            self.transform_config['group_size'] = 1
-        else:
-            self.weight = 0
-        
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
             x_student = self._ff(x_student)
@@ -171,6 +169,7 @@ class ThreeStageChannelGroup(KLDLoss):
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
             x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
+        x_student,x_teacher = self._shuffle(x_student,step),self._shuffle(x_teacher,step)
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
         
@@ -179,3 +178,5 @@ class ThreeStageChannelGroup(KLDLoss):
         loss = self.weight*self.KLDiv(x_student,x_teacher)
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
+    
+    
