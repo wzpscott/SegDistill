@@ -46,8 +46,8 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
-        {'student_layer':'backbone.block4.1.attn.V',
-        'teacher_layer':'backbone.block4.2.attn.V',
+        {'student_layer':'backbone.block4.1.attn.Q',
+        'teacher_layer':'backbone.block4.2.attn.Q',
         'loss_name':'KLDLoss',
         'loss_config':{
             'weight':1,
@@ -77,7 +77,7 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.14/v_cg4'
+work_dir = '/apdcephfs/private_inchzhang/shared_info/qkv_stage4/q_cg4'
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  

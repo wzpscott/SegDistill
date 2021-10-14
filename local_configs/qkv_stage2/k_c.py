@@ -46,17 +46,17 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
-        {'student_layer':'decode_head.linear_pred',
-        'teacher_layer':'decode_head.linear_pred',
-        'loss_name':'ShiftChannelLoss',
+        {'student_layer':'backbone.block2.1.attn.K',
+        'teacher_layer':'backbone.block2.2.attn.K',
+        'loss_name':'KLDLoss',
         'loss_config':{
             'weight':1,
             'tau':1,
-            'reshape_config':'logits',
-            'resize_config':{'mode':'bilinear','align_corners':False},
+            'reshape_config':'attention',
+            'resize_config':False,
             'mask_config':False,
-            'transform_config':{'loss_type':'channel','group_size':5},
-            'ff_config':False
+            'transform_config':{'loss_type':'channel','group_size':1},
+            'ff_config':{'in_channels':32, 'out_channels':64, 'kernel_size':1}
             },
         },
     ],
@@ -77,7 +77,7 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.14/cg5_shift'
+work_dir = '/apdcephfs/private_inchzhang/shared_info/qkv_stage2/k_c'
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  
