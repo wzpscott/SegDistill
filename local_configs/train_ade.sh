@@ -10,3 +10,4 @@ bash tools/dist_train.sh local_configs/10.15/cg10+w=2+shift+earlystop.py 8
 bash tools/dist_train.sh local_configs/10.15/cg10+w=2+shift.py 8
 bash tools/dist_train.sh local_configs/10.15/logits_cg10_shuffle.py 8
 bash tools/dist_train.sh local_configs/10.15/cg10+w=2.py 8
+bash tools/dist_train.sh local_configs/10.15/all_softmax.py 8
