@@ -10,7 +10,7 @@ from mmseg.ops import resize
 class KLDLoss(nn.Module):
     def __init__(self,weight,tau,\
         reshape_config,resize_config,mask_config,transform_config,ff_config,\
-        earlystop_config=None):
+        earlystop_config=None,shift_config=None):
         super().__init__()
         self.weight = weight
         self.tau = tau
@@ -22,6 +22,7 @@ class KLDLoss(nn.Module):
         self.transform_config = transform_config
 
         self.earlystop_config = earlystop_config if earlystop_config else False
+        self.shift_config = shift_config if shift_config else False
 
         self.ff = nn.Conv2d(**ff_config).cuda() if ff_config else False
 
@@ -78,6 +79,14 @@ class KLDLoss(nn.Module):
             
         return x
 
+    def _shift(self,x,step):
+        B,C,W,H = x.shape
+        stride = step % C
+        x1 = x[:,:stride,:,:]
+        x2 = x[:,stride:,:,:]
+        x = torch.cat([x2,x1],dim=1).contiguous()
+        return x
+
     def _ff(self,x):
         return self.ff(x)
 
@@ -106,6 +115,8 @@ class KLDLoss(nn.Module):
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
             x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
+        if self.shift_config:
+            x_student,x_teacher = self._shift(x_student,step),self._shift(x_teacher,step)
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
         
@@ -120,12 +131,10 @@ class ShiftChannelLoss(KLDLoss):
         reshape_config,resize_config,mask_config,transform_config,ff_config,\
         earlystop_config=None):
         super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
-    def _shift(self,x,step):
+    def _transform(self,x):
         B,C,W,H = x.shape
-        stride = step % C
-        x1 = x[:,:stride,:,:]
-        x2 = x[:,stride:,:,:]
-        x = torch.cat([x2,x1],dim=1).contiguous()
+        x = x.reshape(B,C,W*H,1).permute(0,2,1,3)
+        x = F.unfold(x,kernel_size=(self.transform_config['group_size'],1)).transpose(1,2)
         return x
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
         if self.earlystop_config:
@@ -138,7 +147,6 @@ class ShiftChannelLoss(KLDLoss):
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
             x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
-        x_student,x_teacher = self._shift(x_student,step),self._shift(x_teacher,step)
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
         
@@ -153,11 +161,12 @@ class ShuffleChannelLoss(KLDLoss):
         reshape_config,resize_config,mask_config,transform_config,ff_config,\
         earlystop_config=None):
         super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
-    def _shuffle(self,x,step):
-        B,C,W,H = x.shape
+    def _shuffle(self,x_student,x_teacher):
+        B,C,W,H = x_student.shape
         idx = torch.randperm(C)
-        x = x[:,idx,:,:].contiguous()
-        return x
+        x_student = x_student[:,idx,:,:].contiguous()
+        x_teacher = x_teacher[:,idx,:,:].contiguous()
+        return x_student,x_teacher
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
         if self.earlystop_config:
             if step > self.earlystop_config:
@@ -169,7 +178,7 @@ class ShuffleChannelLoss(KLDLoss):
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
             x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
-        x_student,x_teacher = self._shuffle(x_student,step),self._shuffle(x_teacher,step)
+        x_student,x_teacher = self._shuffle(x_student,x_teacher)
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
         
@@ -179,4 +188,39 @@ class ShuffleChannelLoss(KLDLoss):
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
     
-    
+class ShuffleShiftLoss(KLDLoss):
+    def __init__(self,weight,tau,\
+        reshape_config,resize_config,mask_config,transform_config,ff_config,\
+        earlystop_config=None):
+        super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
+    def _transform(self,x):
+        B,C,W,H = x.shape
+        x = x.reshape(B,C,W*H,1).permute(0,2,3,1)
+        x = F.unfold(x,kernel_size=(self.group,1)).transpose(1,2)
+        return x
+    def _shuffle(self,x_student,x_teacher):
+        B,C,W,H = x_student.shape
+        idx = torch.randperm(C)
+        x_student = x_student[:,idx,:,:].contiguous()
+        x_teacher = x_teacher[:,idx,:,:].contiguous()
+        return x_student,x_teacher
+    def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+        x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
+        if self.ff :
+            x_student = self._ff(x_student)
+        if self.resize_config:
+            x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
+        if self.mask_config:
+            x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
+        x_student,x_teacher = self._shuffle(x_student,x_teacher)
+        if self.transform_config:
+            x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
+        
+        x_student = F.log_softmax(x_student/self.tau,dim=-1)
+        x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
+        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        loss = loss/(x_student.numel()/x_student.shape[-1])
+        return loss 
