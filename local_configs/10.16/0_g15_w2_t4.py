@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/datasets/cityscapes_1024x1024_repeat.py',
+    '../_base_/datasets/ade20k_repeat.py',
     '../_base_/default_runtime.py',
     '../_base_/schedules/schedule_160k_adamw.py'
 ]
@@ -21,7 +21,7 @@ model = dict(
             feature_strides=[4, 8, 16, 32],
             channels=128,
             dropout_ratio=0.1,
-            num_classes=19,
+            num_classes=150,
             norm_cfg=norm_cfg,
             align_corners=False,
             decoder_params=dict(embed_dim=256),
@@ -39,7 +39,7 @@ model = dict(
             feature_strides=[4, 8, 16, 32],
             channels=128,
             dropout_ratio=0.1,
-            num_classes=19,
+            num_classes=150,
             norm_cfg=norm_cfg,
             align_corners=False,
             decoder_params=dict(embed_dim=768),
@@ -50,18 +50,19 @@ model = dict(
         'teacher_layer':'decode_head.linear_pred',
         'loss_name':'KLDLoss',
         'loss_config':{
-            'weight':1,
-            'tau':1,
+            'weight':2,
+            'tau':4,
             'reshape_config':'logits',
             'resize_config':{'mode':'bilinear','align_corners':False},
             'mask_config':False,
-            'transform_config':{'loss_type':'channel','group_size':1},
+            'transform_config':{'loss_type':'channel','group_size':15},
             'ff_config':False,
+            'earlystop_config':112000,
             },
         },
     ],
     s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
-    t_pretrain = './pretrained/segformer.b4.1024x1024.city.160k.pth',  # 老师的预训练模型
+    t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',  # 老师的预训练模型
     train_cfg=dict(),
     test_cfg=dict(mode='whole'),
 )
@@ -77,7 +78,7 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.15/City_c'
+work_dir = '/apdcephfs/private_inchzhang/shared_info/10.16/0_g15_w2_t4'
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  

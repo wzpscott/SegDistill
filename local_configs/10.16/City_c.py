@@ -77,7 +77,7 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.15/City_c'
+work_dir = '/apdcephfs/private_inchzhang/shared_info/10.16/City_c'
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  

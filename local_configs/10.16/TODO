@@ -1,0 +1,5 @@
+group size=15的所有实验
+cg15+shift搜索超参数
+cg15+shift+earlystop搜索超参数
+针对feature层的所有实验
+不同student size的实验(b4->b0,b4->b1,b4->b2) w=3,T=4

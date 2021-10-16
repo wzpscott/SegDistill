@@ -24,7 +24,7 @@ class KLDLoss(nn.Module):
         self.earlystop_config = earlystop_config if earlystop_config else False
         self.shift_config = shift_config if shift_config else False
 
-        self.ff = nn.Conv2d(**ff_config).cuda() if ff_config else False
+        self.ff = nn.Conv2d(**ff_config,kernel_size=1).cuda() if ff_config else False
 
 
     def _resize(self,x,gt_semantic_seg):
@@ -161,11 +161,12 @@ class ShuffleChannelLoss(KLDLoss):
         reshape_config,resize_config,mask_config,transform_config,ff_config,\
         earlystop_config=None):
         super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
-    def _shuffle(self,x_student,x_teacher):
+    def _shuffle(self,x_student,x_teacher,step):
         B,C,W,H = x_student.shape
-        idx = torch.randperm(C)
-        x_student = x_student[:,idx,:,:].contiguous()
-        x_teacher = x_teacher[:,idx,:,:].contiguous()
+        if step % 1600 == 1:
+            self.idx = torch.randperm(C)
+        x_student = x_student[:,self.idx,:,:].contiguous()
+        x_teacher = x_teacher[:,self.idx,:,:].contiguous()
         return x_student,x_teacher
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
         if self.earlystop_config:
@@ -178,7 +179,7 @@ class ShuffleChannelLoss(KLDLoss):
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
             x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
-        x_student,x_teacher = self._shuffle(x_student,x_teacher)
+        x_student,x_teacher = self._shuffle(x_student,x_teacher,step)
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
         
