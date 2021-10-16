@@ -195,8 +195,8 @@ class ShuffleShiftLoss(KLDLoss):
         super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
     def _transform(self,x):
         B,C,W,H = x.shape
-        x = x.reshape(B,C,W*H,1).permute(0,2,3,1)
-        x = F.unfold(x,kernel_size=(self.group,1)).transpose(1,2)
+        x = x.reshape(B,C,W*H,1).permute(0,2,1,3)
+        x = F.unfold(x,kernel_size=(self.transform_config['group_size'],1)).transpose(1,2)
         return x
     def _shuffle(self,x_student,x_teacher):
         B,C,W,H = x_student.shape
