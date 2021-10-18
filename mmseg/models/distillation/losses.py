@@ -10,7 +10,7 @@ from mmseg.ops import resize
 class KLDLoss(nn.Module):
     def __init__(self,weight,tau,\
         reshape_config,resize_config,mask_config,transform_config,ff_config,\
-        earlystop_config=None,shift_config=None):
+        earlystop_config=None,shift_config=None,warmup_config=0):
         super().__init__()
         self.weight = weight
         self.tau = tau
@@ -25,6 +25,11 @@ class KLDLoss(nn.Module):
         self.shift_config = shift_config if shift_config else False
 
         self.ff = nn.Conv2d(**ff_config,kernel_size=1).cuda() if ff_config else False
+        
+        self.warmup_config = warmup_config if warmup_config > 0 else False
+        if self.warmup_config:
+            self.weight_ = weight
+
 
 
     def _resize(self,x,gt_semantic_seg):
@@ -105,9 +110,15 @@ class KLDLoss(nn.Module):
         return x
 
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if self.warmup_config:
+            if step < self.warmup_config:
+                self.weight = step**2/self.warmup_config**2
+            else:
+                self.weight = self.weight_
         if self.earlystop_config:
             if step > self.earlystop_config:
                 self.weight = 0
+
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
             x_student = self._ff(x_student)
@@ -225,3 +236,50 @@ class ShuffleShiftLoss(KLDLoss):
         loss = self.weight*self.KLDiv(x_student,x_teacher)
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss 
+
+
+class AttentionLoss(nn.Module):
+    def __init__(self,weight,tau,transform_config,earlystop_config,warmup_config):
+        super().__init__()
+        self.weight = weight
+        self.weight_ = weight
+        self.tau = tau
+        self.transform_config = transform_config
+        self.earlystop_config = earlystop_config if earlystop_config else False
+        self.warmup_config = warmup_config
+
+        self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+
+    def _transform(self,x):
+        loss_type = self.transform_config['loss_type']
+        B,N,C = x.shape
+        if loss_type == 'channel':
+            group_size = self.transform_config['group_size']
+            x = x.permute(0,2,1)
+            x = x.reshape(B,C//group_size,-1)
+        elif loss_type == 'spatial':
+            pass
+        return x
+    def forward(self,attn_student,v_student,attn_teacher,gt,step):
+        if step < self.warmup_config:
+            self.weight = (step**2)/(self.warmup_config**2)
+        else:
+            self.weight = self.weight_
+
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+
+        B,num_head,_,C = v_student.shape
+        _,_,N,_ = attn_student.shape
+
+        C = C * num_head
+        x = (attn_student @ v_student).transpose(1, 2).reshape(B, N, C)
+        x_mimic = (attn_teacher @ v_student).transpose(1, 2).reshape(B, N, C)
+
+        x,x_mimic = self._transform(x),self._transform(x_mimic)
+        x = F.log_softmax(x/self.tau,dim=-1)
+        x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
+        loss = self.weight*self.KLDiv(x,x_mimic)
+        loss = loss/(x.numel()/x.shape[-1])
+        return loss

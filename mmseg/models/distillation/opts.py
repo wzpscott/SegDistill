@@ -30,18 +30,30 @@ class Extractor(nn.Module):
         self.teacher_features = {}
         self.student_features = {}
 
+        teacher_layers = []
+        student_layers = []
+
         for i in range(len(distillation)):
             student_layer, teacher_layer = distillation[i]['student_layer'], distillation[i]['teacher_layer']
+            if isinstance(student_layer,list):
+                student_layers += student_layer
+            else:
+                student_layers.append(student_layer)
 
-            for name, module in teacher.named_modules():
-                if name == teacher_layer:
-                    module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='teacher'))
-                    print(f'teacher_layer :{teacher_layer} hooked!!!!')
+            if isinstance(teacher_layer,list):
+                teacher_layers += teacher_layer
+            else:
+                teacher_layers.append(teacher_layer)
 
-            for name, module in student.named_modules():
-                if name == student_layer:
-                    module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='student'))
-                    print(f'student_layer :{student_layer} hooked!!!!')
+        for name, module in teacher.named_modules():
+            if name in teacher_layers:
+                module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='teacher'))
+                print(f'teacher_layer :{name} hooked!!!!')
+
+        for name, module in student.named_modules():
+            if name in student_layers:
+                module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='student'))
+                print(f'student_layer :{name} hooked!!!!')
 
     def hook_fn_forward(self, module, input, output, name, type):
         if self.training == True:
@@ -57,7 +69,9 @@ class DistillationLoss(nn.Module):
 
         for i in range(len(distillation)):
             loss_name = distillation[i]['loss_name'] 
-            loss_config =  distillation[i]['loss_config']  
+            loss_config = distillation[i]['loss_config'] 
+            if isinstance(loss_config,tuple):
+                loss_config = loss_config[0]
             criterion = eval(loss_name)(**loss_config) 
             distillation[i]['criterion'] = criterion
 
@@ -66,17 +80,25 @@ class DistillationLoss(nn.Module):
         distillation_losses = {}
         for i in range(len(self.distillation)):
             student_layer, teacher_layer = self.distillation[i]['student_layer'], self.distillation[i]['teacher_layer']
-            x_student, x_teacher = student_features[student_layer], teacher_features[teacher_layer]
+            if isinstance(student_layer,list):
+                attn_student,v_student = student_features[student_layer[0]],student_features[student_layer[1]]
+                attn_teacher = teacher_features[teacher_layer]
+                criterion = self.distillation[i]['criterion']
+                loss = criterion(attn_student,v_student,attn_teacher,gt_semantic_seg,step)
+                loss_name = f'loss_{student_layer[0]}<->{teacher_layer}_re'
+                distillation_losses[loss_name] = loss
+            else:
+                x_student, x_teacher = student_features[student_layer], teacher_features[teacher_layer]
 
-            criterion = self.distillation[i]['criterion']
-            loss = criterion(x_student, x_teacher,gt_semantic_seg,step)
+                criterion = self.distillation[i]['criterion']
+                loss = criterion(x_student,x_teacher,gt_semantic_seg,step)
 
-            try:
-                loss_info = self.distillation[i]['loss_config']['transform_config']
-            except:
-                loss_info = 'other'
-            loss_name = f'loss_{student_layer}<->{teacher_layer}_{loss_info}'
-            distillation_losses[loss_name] = loss
+                try:
+                    loss_info = self.distillation[i]['loss_config']['transform_config']
+                except:
+                    loss_info = 'other'
+                loss_name = f'loss_{student_layer}<->{teacher_layer}_{loss_info}'
+                distillation_losses[loss_name] = loss
 
         return distillation_losses
 
