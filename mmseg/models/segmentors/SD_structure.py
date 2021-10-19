@@ -18,7 +18,7 @@ from ..distillation.losses import *
 @SEGMENTORS.register_module()
 class SDModule(BaseSegmentor):
     def __init__(self,
-                 cfg_s, cfg_t,train_cfg,test_cfg,distillation,s_pretrain,t_pretrain):
+                 cfg_s, cfg_t,train_cfg,test_cfg,distillation,s_pretrain=None,t_pretrain=None):
         super().__init__()
         self.cfg_s = cfg_s
         self.cfg_t = cfg_t
@@ -26,6 +26,9 @@ class SDModule(BaseSegmentor):
 
         self.student = builder.build_segmentor(
             cfg_s, train_cfg=train_cfg, test_cfg=test_cfg)
+        if s_pretrain:
+           self.student.load_state_dict(torch.load(
+                s_pretrain)['state_dict'],strict=True) 
 
         self.teacher = builder.build_segmentor(
                     cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)

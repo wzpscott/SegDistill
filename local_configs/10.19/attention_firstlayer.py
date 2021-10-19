@@ -6,6 +6,17 @@ _base_ = [
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 
+attention_config = {
+        'weight':0.1,
+        'tau':1,
+        'reshape_config':'attention',
+        'resize_config':False,
+        'mask_config':False,
+        'transform_config':{'loss_type':'channel','group_size':1},
+        'ff_config':False,
+        },
+
+
 model = dict(
     type='SDModule',
     cfg_s=dict(
@@ -30,7 +41,7 @@ model = dict(
     cfg_t=dict(
         type='EncoderDecoder',
         backbone=dict(
-            type='mit_b1',
+            type='mit_b4',
             style='pytorch'),
         decode_head=dict(
             type='SegFormerHead',
@@ -46,23 +57,28 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
-        {'student_layer':'decode_head.linear_pred',
-        'teacher_layer':'decode_head.linear_pred',
+        {'student_layer':'backbone.block1.0.attn.ATTN',
+        'teacher_layer':'backbone.block1.0.attn.ATTN',
         'loss_name':'KLDLoss',
-        'loss_config':{
-            'weight':2,
-            'tau':1,
-            'reshape_config':'logits',
-            'resize_config':{'mode':'bilinear','align_corners':False},
-            'mask_config':False,
-            'transform_config':{'loss_type':'channel','group_size':10},
-            'ff_config':False,
-            'earlystop_config':112000,
-            },
+        'loss_config':attention_config
+        },
+        {'student_layer':'backbone.block2.0.attn.ATTN',
+        'teacher_layer':'backbone.block2.0.attn.ATTN',
+        'loss_name':'KLDLoss',
+        'loss_config':attention_config
+        },
+        {'student_layer':'backbone.block3.0.attn.ATTN',
+        'teacher_layer':'backbone.block3.0.attn.ATTN',
+        'loss_name':'KLDLoss',
+        'loss_config':attention_config
+        },
+        {'student_layer':'backbone.block4.0.attn.ATTN',
+        'teacher_layer':'backbone.block4.0.attn.ATTN',
+        'loss_name':'KLDLoss',
+        'loss_config':attention_config
         },
     ],
-    s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
-    t_pretrain = './pretrained/segformer.b1.512x512.ade.160k.pth',  # 老师的预训练模型
+    t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',  # 老师的预训练模型
     train_cfg=dict(),
     test_cfg=dict(mode='whole'),
 )
@@ -78,8 +94,8 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.18/b1b0'
-
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  
+work_dir = '/apdcephfs/private_inchzhang/shared_info/10.19/attention_firstlayer'
 # resume_from = ''
+
