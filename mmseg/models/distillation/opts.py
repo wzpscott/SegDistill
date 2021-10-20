@@ -55,6 +55,7 @@ class Extractor(nn.Module):
                 module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='student'))
                 print(f'student_layer :{name} hooked!!!!')
 
+
     def hook_fn_forward(self, module, input, output, name, type):
         if self.training == True:
             if type == 'student':

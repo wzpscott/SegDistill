@@ -170,19 +170,34 @@ class ShiftChannelLoss(KLDLoss):
 class ShuffleChannelLoss(KLDLoss):
     def __init__(self,weight,tau,\
         reshape_config,resize_config,mask_config,transform_config,ff_config,\
-        earlystop_config=None):
+        earlystop_config=None,shuffle_config=None):
+        self.weight_ = weight
+        self.shuffle_config = shuffle_config
         super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
-    def _shuffle(self,x_student,x_teacher,step):
-        B,C,W,H = x_student.shape
-        if step % 1600 == 1:
-            self.idx = torch.randperm(C)
-        x_student = x_student[:,self.idx,:,:].contiguous()
-        x_teacher = x_teacher[:,self.idx,:,:].contiguous()
-        return x_student,x_teacher
+    def _shuffle(self,x,step):
+        B,N,G = x.shape
+        if self.shuffle_config != 0:
+            if step % self.shuffle_config == 0:
+                x = x.transpose(1,2)
+                x = x.reshape(B,-1)
+                x = x.reshape(B,N,G)
+        else:
+            x = x.transpose(1,2)
+            x = x.reshape(B,-1)
+            x = x.reshape(B,N,G)
+        return x
+
+        
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if step < self.warmup_config:
+            self.weight = step/self.warmup_config
+        else:
+            self.weight = self.weight_
+
         if self.earlystop_config:
             if step > self.earlystop_config:
                 self.weight = 0
+
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
             x_student = self._ff(x_student)
@@ -190,10 +205,10 @@ class ShuffleChannelLoss(KLDLoss):
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
             x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
-        x_student,x_teacher = self._shuffle(x_student,x_teacher,step)
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
-        
+        x_student,x_teacher = self._shuffle(x_student,step),self._shuffle(x_teacher,step)
+
         x_student = F.log_softmax(x_student/self.tau,dim=-1)
         x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
         loss = self.weight*self.KLDiv(x_student,x_teacher)
