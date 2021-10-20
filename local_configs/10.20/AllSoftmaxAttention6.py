@@ -1,3 +1,4 @@
+# 每stage第一层+warmup+logits+very_long_warmup
 _base_ = [
     '../_base_/datasets/ade20k_repeat.py',
     '../_base_/default_runtime.py',
@@ -12,23 +13,11 @@ attention_config = {
         'reshape_config':'attention',
         'resize_config':False,
         'mask_config':False,
-        'transform_config':{'loss_type':'channel','group_size':1},
+        'transform_config':{'loss_type':'channel','group_size':256},
         'ff_config':False,
-        'earlystop_config':60000,
-        'warmup_config':20000
+        'earlystop_config':80000,
+        'warmup_config':60000
         },
-logits_config = {
-        'weight':2,
-        'tau':1,
-        'reshape_config':'logits',
-        'resize_config':{'mode':'bilinear','align_corners':False},
-        'mask_config':False,
-        'transform_config':{'loss_type':'channel','group_size':15},
-        'ff_config':False,
-        'earlystop_config':120000,
-        'warmup_config':5000
-        },
-
 
 model = dict(
     type='SDModule',
@@ -75,18 +64,8 @@ model = dict(
         'loss_name':'KLDLoss',
         'loss_config':attention_config
         },
-        {'student_layer':'backbone.block1.1.attn.ATTN',
-        'teacher_layer':'backbone.block1.2.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
         {'student_layer':'backbone.block2.0.attn.ATTN',
         'teacher_layer':'backbone.block2.0.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block2.1.attn.ATTN',
-        'teacher_layer':'backbone.block2.7.attn.ATTN',
         'loss_name':'KLDLoss',
         'loss_config':attention_config
         },
@@ -95,28 +74,26 @@ model = dict(
         'loss_name':'KLDLoss',
         'loss_config':attention_config
         },
-        {'student_layer':'backbone.block3.1.attn.ATTN',
-        'teacher_layer':'backbone.block3.26.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
         {'student_layer':'backbone.block4.0.attn.ATTN',
         'teacher_layer':'backbone.block4.0.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block4.1.attn.ATTN',
-        'teacher_layer':'backbone.block4.2.attn.ATTN',
         'loss_name':'KLDLoss',
         'loss_config':attention_config
         },
         {'student_layer':'decode_head.linear_pred',
         'teacher_layer':'decode_head.linear_pred',
         'loss_name':'KLDLoss',
-        'loss_config':logits_config
+        'loss_config':{
+            'weight':2,
+            'tau':1,
+            'reshape_config':'logits',
+            'resize_config':{'mode':'bilinear','align_corners':False},
+            'mask_config':False,
+            'transform_config':{'loss_type':'channel','group_size':10},
+            'ff_config':False,
+            'earlystop_config':120000,
+            },
         },
     ],
-    s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',  # 老师的预训练模型
     train_cfg=dict(),
     test_cfg=dict(mode='whole'),
@@ -135,6 +112,6 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.18/re+attn+logits'
+work_dir = '/apdcephfs/private_inchzhang/shared_info/10.20/AllSoftmaxAttention6'
 # resume_from = ''
 

@@ -112,7 +112,7 @@ class KLDLoss(nn.Module):
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
         if self.warmup_config:
             if step < self.warmup_config:
-                self.weight = step**2/self.warmup_config**2
+                self.weight = step/self.warmup_config
             else:
                 self.weight = self.weight_
         if self.earlystop_config:
@@ -261,8 +261,10 @@ class AttentionLoss(nn.Module):
             pass
         return x
     def forward(self,attn_student,v_student,attn_teacher,gt,step):
+        v_student = v_student.detach()
+
         if step < self.warmup_config:
-            self.weight = (step**2)/(self.warmup_config**2)
+            self.weight = step/self.warmup_config
         else:
             self.weight = self.weight_
 
