@@ -275,9 +275,7 @@ class AttentionLoss(nn.Module):
         elif loss_type == 'spatial':
             pass
         return x
-    def forward(self,attn_student,v_student,attn_teacher,gt,step):
-        v_student = v_student.detach()
-
+    def forward(self,attn_student,v_student,attn_teacher,v_teacher,gt,step):
         if step < self.warmup_config:
             self.weight = step/self.warmup_config
         else:
@@ -289,7 +287,65 @@ class AttentionLoss(nn.Module):
 
         B,num_head,_,C = v_student.shape
         _,_,N,_ = attn_student.shape
+        attn_student  = attn_student.softmax(dim=-1)
+        attn_teacher  = attn_teacher.softmax(-1)
+        C = C * num_head
+        x = (attn_student @ v_student).transpose(1, 2).reshape(B, N, C)
+        x_mimic = (attn_teacher @ v_student).transpose(1, 2).reshape(B, N, C)
+        
+        # print(attn_teacher.shape,v_teacher.shape,attn_student.shape,v_student.shape)
+        # x_teacher = (attn_teacher @ v_teacher).transpose(1, 2).reshape(B, N, -1)
+        # import pickle as pkl
 
+        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/student','wb') as f:
+        #     pkl.dump(x.detach().cpu().numpy(),f)
+        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/mimic','wb') as f:
+        #     pkl.dump(x_mimic.detach().cpu().numpy(),f)
+        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/gt','wb') as f:
+        #     pkl.dump(gt.detach().cpu().numpy(),f)
+        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/teacher','wb') as f:
+        #     pkl.dump(x_teacher.detach().cpu().numpy(),f)
+        # raise ValueError('ddddd')
+
+        x,x_mimic = self._transform(x),self._transform(x_mimic)
+        x = F.log_softmax(x/self.tau,dim=-1)
+        x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
+        loss = self.weight*self.KLDiv(x,x_mimic)
+        loss = loss/(x.numel()/x.shape[-1])
+        return loss
+
+
+class StudentRE(nn.Module):
+    def __init__(self,weight,tau,transform_config,earlystop_config,**kwargs):
+        super().__init__()
+        self.weight = weight
+        self.weight_ = weight
+        self.tau = tau
+        self.transform_config = transform_config
+        self.earlystop_config = earlystop_config if earlystop_config else False
+
+        self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+
+    def _transform(self,x):
+        loss_type = self.transform_config['loss_type']
+        B,N,C = x.shape
+        if loss_type == 'channel':
+            group_size = self.transform_config['group_size']
+            x = x.permute(0,2,1)
+            x = x.reshape(B,C//group_size,-1)
+        elif loss_type == 'spatial':
+            pass
+        return x
+    def forward(self,attn_student,v_student,attn_teacher,v_teacher,gt,step):
+
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+
+        B,num_head,_,C = v_student.shape
+        _,_,N,_ = attn_student.shape
+        attn_student  = attn_student.softmax(dim=-1)
+        attn_teacher  = attn_teacher.softmax(-1)
         C = C * num_head
         x = (attn_student @ v_student).transpose(1, 2).reshape(B, N, C)
         x_mimic = (attn_teacher @ v_student).transpose(1, 2).reshape(B, N, C)
@@ -299,4 +355,75 @@ class AttentionLoss(nn.Module):
         x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
         loss = self.weight*self.KLDiv(x,x_mimic)
         loss = loss/(x.numel()/x.shape[-1])
+        return loss
+
+class TeacherRE(nn.Module):
+    def __init__(self,weight,tau,transform_config,earlystop_config,**kwargs):
+        super().__init__()
+        self.weight = weight
+        self.weight_ = weight
+        self.tau = tau
+        self.transform_config = transform_config
+        self.earlystop_config = earlystop_config if earlystop_config else False
+
+        self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+
+    def _transform(self,x):
+        loss_type = self.transform_config['loss_type']
+        B,N,C = x.shape
+        if loss_type == 'channel':
+            group_size = self.transform_config['group_size']
+            x = x.permute(0,2,1)
+            x = x.reshape(B,C//group_size,-1)
+        elif loss_type == 'spatial':
+            pass
+        return x
+    def forward(self,attn_student,v_student,attn_teacher,v_teacher,gt,step):
+
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+
+        B,num_head,_,C = v_teacher.shape
+        _,_,N,_ = attn_teacher.shape
+        attn_student  = attn_student.softmax(dim=-1)
+        attn_teacher  = attn_teacher.softmax(-1)
+        C = C * num_head
+        x = (attn_teacher @ v_teacher).transpose(1, 2).reshape(B, N, C)
+        x_mimic = (attn_student @ v_teacher).transpose(1, 2).reshape(B, N, C)
+
+        x,x_mimic = self._transform(x),self._transform(x_mimic)
+        x = F.log_softmax(x/self.tau,dim=-1)
+        x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
+        loss = self.weight*self.KLDiv(x,x_mimic)
+        loss = loss/(x.numel()/x.shape[-1])
+        return loss
+
+class FlattenLoss(nn.Module):
+    def __init__(self,weight,tau,transform_config,earlystop_config,**kwargs):
+        super().__init__()
+        self.weight = weight
+        self.weight_ = weight
+        self.tau = tau
+        self.transform_config = transform_config
+        self.earlystop_config = earlystop_config if earlystop_config else False
+
+        self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+
+    def forward(self,x_student,x_teacher,gt,step):
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+
+        B,WH,C_s = x_student.shape
+        B,WH,C_t = x_teacher.shape
+
+        x_student = F.log_softmax(x_student/self.tau,dim=1)
+        x_teacher = F.softmax(x_teacher/self.tau,dim=1)
+
+        x_student = x_student.mean(dim=2)
+        x_teacher = x_teacher.mean(dim=2)
+
+        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss

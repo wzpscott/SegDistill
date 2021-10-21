@@ -133,10 +133,4 @@ work_dir = '/apdcephfs/private_inchzhang/shared_info/10.20/swin_cg15'
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')  
 
-log_config = dict(
-    interval=10,
-    hooks=[
-        dict(type='TextLoggerHook', by_epoch=False),
-        # dict(type='TensorboardLoggerHook')
-    ])
 # resume_from = ''

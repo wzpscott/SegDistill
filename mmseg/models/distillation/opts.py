@@ -83,9 +83,9 @@ class DistillationLoss(nn.Module):
             student_layer, teacher_layer = self.distillation[i]['student_layer'], self.distillation[i]['teacher_layer']
             if isinstance(student_layer,list):
                 attn_student,v_student = student_features[student_layer[0]],student_features[student_layer[1]]
-                attn_teacher = teacher_features[teacher_layer]
+                attn_teacher,v_teacher = teacher_features[teacher_layer[0]],teacher_features[teacher_layer[1]]
                 criterion = self.distillation[i]['criterion']
-                loss = criterion(attn_student,v_student,attn_teacher,gt_semantic_seg,step)
+                loss = criterion(attn_student,v_student,attn_teacher,v_teacher,gt_semantic_seg,step)
                 loss_name = f'loss_{student_layer[0]}<->{teacher_layer}_re'
                 distillation_losses[loss_name] = loss
             else:

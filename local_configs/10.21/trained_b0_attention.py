@@ -22,6 +22,7 @@ model = dict(
     type='SDModule',
     cfg_s=dict(
         type='EncoderDecoder',
+        pretrained='pretrained/mit_b0.pth',
         backbone=dict(
             type='mit_b0',
             style='pytorch'),
@@ -57,48 +58,59 @@ model = dict(
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
-        {'student_layer':'backbone.block1.0.attn.ATTN',
-        'teacher_layer':'backbone.block1.0.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block1.1.attn.ATTN',
-        'teacher_layer':'backbone.block1.2.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block2.0.attn.ATTN',
-        'teacher_layer':'backbone.block2.0.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block2.1.attn.ATTN',
-        'teacher_layer':'backbone.block2.7.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block3.0.attn.ATTN',
-        'teacher_layer':'backbone.block3.0.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block3.1.attn.ATTN',
-        'teacher_layer':'backbone.block3.26.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block4.0.attn.ATTN',
-        'teacher_layer':'backbone.block4.0.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
-        },
-        {'student_layer':'backbone.block4.1.attn.ATTN',
-        'teacher_layer':'backbone.block4.2.attn.ATTN',
-        'loss_name':'KLDLoss',
-        'loss_config':attention_config
+        # {'student_layer':'backbone.block1.0.attn.ATTN',
+        # 'teacher_layer':'backbone.block1.0.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        # {'student_layer':'backbone.block1.1.attn.ATTN',
+        # 'teacher_layer':'backbone.block1.2.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        # {'student_layer':'backbone.block2.0.attn.ATTN',
+        # 'teacher_layer':'backbone.block2.0.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        # {'student_layer':'backbone.block2.1.attn.ATTN',
+        # 'teacher_layer':'backbone.block2.7.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        # {'student_layer':'backbone.block3.0.attn.ATTN',
+        # 'teacher_layer':'backbone.block3.0.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        # {'student_layer':'backbone.block3.1.attn.ATTN',
+        # 'teacher_layer':'backbone.block3.26.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        # {'student_layer':'backbone.block4.0.attn.ATTN',
+        # 'teacher_layer':'backbone.block4.0.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        # {'student_layer':'backbone.block4.1.attn.ATTN',
+        # 'teacher_layer':'backbone.block4.2.attn.ATTN',
+        # 'loss_name':'KLDLoss',
+        # 'loss_config':attention_config
+        # },
+        {'student_layer':['backbone.block1.1.attn.ATTN','backbone.block1.1.attn.V'],
+        'teacher_layer':['backbone.block1.2.attn.ATTN','backbone.block1.2.attn.V'],
+        'loss_name':'AttentionLoss',
+        'loss_config':{
+            'weight':0.1,
+            'tau':1,
+            'transform_config':{'loss_type':'channel','group_size':256},
+            'earlystop_config':80000,
+            'warmup_config':10000
+            },
         },
     ],
-    s_pretrain = 'pretrained/segformer.b0.512x512.ade.160k.pth', # 学生的预训练模型
+    # s_pretrain = 'pretrained/segformer.b0.512x512.ade.160k.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b4.512x512.ade.160k.pth',  # 老师的预训练模型
     train_cfg=dict(),
     test_cfg=dict(mode='whole'),
@@ -115,8 +127,8 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=2)
+data = dict(samples_per_gpu=6)
 evaluation = dict(interval=16000, metric='mIoU')  
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.20/attention_trained_allsoftmax'
+# work_dir = '/apdcephfs/private_inchzhang/shared_info/10.20/attention_trained_allsoftmax'
 # resume_from = ''
 
