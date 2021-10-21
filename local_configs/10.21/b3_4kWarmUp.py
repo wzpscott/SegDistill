@@ -62,7 +62,6 @@ model = dict(
             },
         },
     ],
-    s_pretrain = './pretrained/mit_b0.pth', # 学生的预训练模型
     t_pretrain = './pretrained/segformer.b3.512x512.ade.160k.pth',  # 老师的预训练模型
     train_cfg=dict(),
     test_cfg=dict(mode='whole'),
