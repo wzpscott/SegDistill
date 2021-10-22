@@ -6,6 +6,7 @@ bash tools/dist_train.sh local_configs/10.23/t_w=64.py 8;
 bash tools/dist_train.sh local_configs/10.23/s+t_w=128.py 8;
 bash tools/dist_train.sh local_configs/10.23/t_w=1.py 8;
 bash tools/dist_train.sh local_configs/10.23/b3_w2t1.py 8;
+bash tools/dist_train.sh local_configs/10.23/swin_large.py 8;
 bash tools/dist_train.sh local_configs/10.23/t_w=256.py 8;
 bash tools/dist_train.sh local_configs/10.23/t_w=512.py 8;
 bash tools/dist_train.sh local_configs/10.23/b3_w2t3.py 8;

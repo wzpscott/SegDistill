@@ -3,11 +3,12 @@ _base_ = [
     '../_base_/default_runtime.py', '../_base_/schedules/schedule_160k.py'
 ]
 model = dict(
-    pretrained='pretrained/swin_tiny_patch4_window7_224.pth',
+    pretrained='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window7_224_22k.pth',
+    # pretrained='pretrained/swin_large_patch4_window7_224_22k.pth',
     backbone=dict(
-        embed_dim=96,
-        depths=[2, 2, 6, 2],
-        num_heads=[3, 6, 12, 24],
+        embed_dim=192,
+        depths=[2, 2, 18, 2],
+        num_heads=[6, 12, 24, 48],
         window_size=7,
         ape=False,
         drop_path_rate=0.3,
@@ -15,11 +16,11 @@ model = dict(
         use_checkpoint=False
     ),
     decode_head=dict(
-        in_channels=[96, 192, 384, 768],
+        in_channels=[192, 384, 768, 1536],
         num_classes=150
     ),
     auxiliary_head=dict(
-        in_channels=384,
+        in_channels=768,
         num_classes=150
     ))
 
@@ -37,4 +38,4 @@ lr_config = dict(_delete_=True, policy='poly',
 
 # By default, models are trained on 8 GPUs with 2 images per GPU
 data=dict(samples_per_gpu=2)
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.23/swin_base'
+work_dir = '/apdcephfs/private_inchzhang/shared_info/10.23/swin_large'
