@@ -341,7 +341,7 @@ class StudentRE(nn.Module):
         if self.earlystop_config:
             if step > self.earlystop_config:
                 self.weight = 0
-
+        v_student = v_student.detach()
         B,num_head,_,C = v_student.shape
         _,_,N,_ = attn_student.shape
         attn_student  = attn_student.softmax(dim=-1)
