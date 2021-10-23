@@ -1,6 +1,6 @@
-from .opts import Extractor, DistillationLoss
+from .opts import Extractor, DistillationLoss,ExtractorMT,DistillationLossMT
 # # from .SdModule import Sd_model
 # from .losses import CriterionKD, CriterionKDMSE, CriterionMSE, VGGFeatureExtractor
 __all__ = [
-    'Extractor', 'DistillationLoss', 'Sd_model'
+    'Extractor', 'DistillationLoss', 'ExtractorMT','DistillationLossMT'
 ]

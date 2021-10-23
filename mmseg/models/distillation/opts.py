@@ -117,4 +117,74 @@ class Conv1d(nn.Module):
         x = x.transpose(1,self.dim)
         return x
     
+
+
+class ExtractorMT(nn.Module):
+    def __init__(self, student, teachers, distillation):
+        super().__init__()
+
+        self.num_teacher = len(teachers)
+
+        self.teacher_features = {}
+        self.student_features = {}
+
+        teacher_layers = []
+        student_layers = []
+
+        for i in range(len(distillation)):
+            student_layer, teacher_layer = distillation[i]['student_layer'], distillation[i]['teacher_layer']
+            if isinstance(student_layer,list):
+                student_layers += student_layer
+            else:
+                student_layers.append(student_layer)
+
+            if isinstance(teacher_layer,list):
+                teacher_layers += teacher_layer
+            else:
+                teacher_layers.append(teacher_layer)
+
+        for i,teacher in enumerate(teachers):
+            for name, module in teacher.named_modules():
+                if name in teacher_layers:
+                    module.register_forward_hook(partial(self.hook_fn_forward, name=name+str(i), type='teacher'))
+                    print(f'teacher_layer :{name} hooked!!!!')
+
+        for name, module in student.named_modules():
+            if name in student_layers:
+                module.register_forward_hook(partial(self.hook_fn_forward, name=name, type='student'))
+                print(f'student_layer :{name} hooked!!!!')
+
+
+    def hook_fn_forward(self, module, input, output, name, type):
+        if self.training == True:
+            if type == 'student':
+                self.student_features[name] = output
+            if type == 'teacher':
+                self.teacher_features[name] = output
         
+class DistillationLossMT(nn.Module):
+    def __init__(self,distillation):
+        super().__init__()
+        for i in range(len(distillation)):
+            loss_name = distillation[i]['loss_name'] 
+            loss_config = distillation[i]['loss_config'] 
+            if isinstance(loss_config,tuple):
+                loss_config = loss_config[0]
+            criterion = eval(loss_name)(**loss_config) 
+            distillation[i]['criterion'] = criterion
+
+        self.distillation = distillation
+    def forward(self,student_features,teacher_features,gt_semantic_seg,step):
+        distillation_losses = {}
+        for i,distillation in enumerate(self.distillation):
+            student_layer = distillation['student_layer']
+            x_student = student_features[student_layer]
+            teacher_layer = distillation['teacher_layer']+str(i)
+            x_teacher = teacher_features[teacher_layer]
+
+            criterion = distillation['criterion']
+            loss = criterion(x_student,x_teacher,gt_semantic_seg,step)
+            loss_name = f'loss_{student_layer}<->{teacher_layer}_{i}'
+            distillation_losses[loss_name] = loss
+
+        return distillation_losses

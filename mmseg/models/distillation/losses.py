@@ -9,17 +9,17 @@ from mmseg.ops import resize
 
 class KLDLoss(nn.Module):
     def __init__(self,weight,tau,\
-        reshape_config,resize_config,mask_config,transform_config,ff_config,\
+        reshape_config=None,resize_config=None,mask_config=None,transform_config=None,ff_config=None,\
         earlystop_config=None,shift_config=None,warmup_config=0):
         super().__init__()
         self.weight = weight
         self.tau = tau
         self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
 
-        self.reshape_config = reshape_config
-        self.resize_config = resize_config
-        self.mask_config = mask_config
-        self.transform_config = transform_config
+        self.reshape_config = reshape_config if reshape_config else False
+        self.resize_config = resize_config if resize_config else False
+        self.mask_config = mask_config if mask_config else False
+        self.transform_config = transform_config if transform_config else False
 
         self.earlystop_config = earlystop_config if earlystop_config else False
         self.shift_config = shift_config if shift_config else False
@@ -27,8 +27,8 @@ class KLDLoss(nn.Module):
         self.ff = nn.Conv2d(**ff_config,kernel_size=1).cuda() if ff_config else False
         
         self.warmup_config = warmup_config if warmup_config > 0 else False
-        if self.warmup_config:
-            self.weight_ = weight
+
+        self.weight_ = weight
 
 
 
@@ -424,6 +424,47 @@ class FlattenLoss(nn.Module):
         x_student = x_student.mean(dim=2)
         x_teacher = x_teacher.mean(dim=2)
 
+        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        loss = loss/(x_student.numel()/x_student.shape[-1])
+        return loss
+
+
+class MTLoss(KLDLoss):
+    def __init__(self,weight,tau,reshape_config,resize_config,transform_config,latestart_config,earlystop_config,rot_config=None,**kwargs):
+        super().__init__(weight,tau,reshape_config=reshape_config,resize_config=resize_config,\
+            transform_config=transform_config)
+        self.weight_ = weight
+
+        self.latestart_config = latestart_config if latestart_config else False
+        self.earlystop_config = earlystop_config if earlystop_config else False
+        self.rot = rot_config if rot_config else False
+
+        self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+    def forward(self,x_student,x_teacher,gt,step):
+        if self.latestart_config:
+            if step < self.latestart_config:
+                self.weight = 0
+            else:
+                self.weight = self.weight_
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+
+        if self.rot:
+            i,interval = self.rot
+            if (step-1) // interval == i:
+                self.weight = self.weight_
+            else:
+                self.weight = 0
+
+        x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
+        if self.resize_config:
+            x_student,x_teacher = self._resize(x_student,gt),self._resize(x_teacher,gt)
+        if self.transform_config:
+            x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
+        
+        x_student = F.log_softmax(x_student/self.tau,dim=-1)
+        x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
         loss = self.weight*self.KLDiv(x_student,x_teacher)
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
