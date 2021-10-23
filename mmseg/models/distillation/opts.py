@@ -176,15 +176,28 @@ class DistillationLossMT(nn.Module):
         self.distillation = distillation
     def forward(self,student_features,teacher_features,gt_semantic_seg,step):
         distillation_losses = {}
-        for i,distillation in enumerate(self.distillation):
+        if len(teacher_features) != len(self.distillation):
+            distillation = self.distillation[0]
+
             student_layer = distillation['student_layer']
             x_student = student_features[student_layer]
-            teacher_layer = distillation['teacher_layer']+str(i)
-            x_teacher = teacher_features[teacher_layer]
 
+            # x_teacher = torch.cat([teacher_features[i].unsqueeze(0) for i in teacher_features],dim=0)
+            x_teacher = [teacher_features[i] for i in teacher_features]
             criterion = distillation['criterion']
             loss = criterion(x_student,x_teacher,gt_semantic_seg,step)
-            loss_name = f'loss_{student_layer}<->{teacher_layer}_{i}'
+            loss_name = f'loss_random'
             distillation_losses[loss_name] = loss
+        else:
+            for i,distillation in enumerate(self.distillation):
+                student_layer = distillation['student_layer']
+                x_student = student_features[student_layer]
+                teacher_layer = distillation['teacher_layer']+str(i)
+                x_teacher = teacher_features[teacher_layer]
+
+                criterion = distillation['criterion']
+                loss = criterion(x_student,x_teacher,gt_semantic_seg,step)
+                loss_name = f'loss_{student_layer}<->{teacher_layer}_{i}'
+                distillation_losses[loss_name] = loss
 
         return distillation_losses

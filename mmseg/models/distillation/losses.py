@@ -50,18 +50,17 @@ class KLDLoss(nn.Module):
             )
         
         mask_tm = (teacher_pd != gt_semantic_seg).bool() # teacher预测错误的pixel
-        mask_st = (student_pd != gt_semantic_seg).bool() # student预测正确的pixel
+        mask_st = (student_pd == gt_semantic_seg).bool() # student预测正确的pixel
         mask_bg = (gt_semantic_seg == 255).bool() # 标签为background的pixel
         masks = {'mask_tm':mask_tm,'mask_st':mask_st,'mask_bg':mask_bg}
 
-        masks_to_apply = [masks[mask_name] for mask_name in self.mask_config['masks']] # 使用的mask
+        masks_to_apply = [masks[mask_name] for mask_name in self.mask_config] # 使用的mask
         mask = masks_to_apply[0]
         for m in masks_to_apply:
             mask = mask & m
         mask = mask.expand(-1,150,-1,-1)
 
-        x_student[mask] = -1e7
-        x_teacher[mask] = -1e7 # 被mask的元素不计算蒸馏损失
+        x_teacher[mask] = x_student[mask].detach().clone()
         return x_student,x_teacher
 
     def _reshape(self,x):
@@ -463,6 +462,69 @@ class MTLoss(KLDLoss):
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
         
+        x_student = F.log_softmax(x_student/self.tau,dim=-1)
+        x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
+        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        loss = loss/(x_student.numel()/x_student.shape[-1])
+        return loss
+
+
+
+class MTRandomLoss(KLDLoss):
+    def __init__(self,weight,tau,reshape_config,resize_config,transform_config,latestart_config,earlystop_config,rot_config=None,**kwargs):
+        super().__init__(weight,tau,reshape_config=reshape_config,resize_config=resize_config,\
+            transform_config=transform_config)
+        self.weight_ = weight
+
+        self.latestart_config = latestart_config if latestart_config else False
+        self.earlystop_config = earlystop_config if earlystop_config else False
+        self.rot = rot_config if rot_config else False
+
+        self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+    def forward(self,x_student,x_teacher,gt,step):
+        if self.latestart_config:
+            if step < self.latestart_config:
+                self.weight = 0
+            else:
+                self.weight = self.weight_
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+
+        if self.rot:
+            i,interval = self.rot
+            if (step-1) // interval == i:
+                self.weight = self.weight_
+            else:
+                self.weight = 0
+
+        # N_teacher,B,C,W,H = x_teacher.shape
+        # teacher_mask = torch.randint(0,2,[N_teacher,B,C]).cuda()
+        # cnt = teacher_mask.sum()
+        # teacher_mask = .expand(N_teacher,B,C,W,H).cuda() # [N_teacher,B,C,W,H]
+        # x_teacher = (x_teacher*teacher_mask).sum(dim=0)
+        # x_teacher = x_teacher / (teacher_mask.sum(dim=0))
+
+        x_student = self._reshape(x_student)
+        x_student = self._resize(x_student,gt)
+        x_student = self._transform(x_student)
+
+        x_teachers = []
+        for x in x_teacher:
+            x = self._reshape(x)
+            x = self._resize(x,gt)
+            x = self._transform(x)
+            x_teachers.append(x)
+        x_teacher = torch.cat([i.unsqueeze(0) for i in x_teachers],dim=0) 
+        num_teachers,B,C,N = x_teacher.shape
+
+        teacher_mask = torch.randint(0,2,[num_teachers,B,C]).cuda()
+        teacher_cnt = teacher_mask.sum(dim=0).reshape(B,C,1).expand(B,C,N)
+        teacher_mask = teacher_mask.reshape(num_teachers,B,C,1)
+        x_teacher = (x_teacher*teacher_mask).sum(dim=0)
+        x_teacher = x_teacher / teacher_cnt
+        x_teacher[teacher_cnt==0] = x_student[teacher_cnt==0].clone()
+
         x_student = F.log_softmax(x_student/self.tau,dim=-1)
         x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
         loss = self.weight*self.KLDiv(x_student,x_teacher)
