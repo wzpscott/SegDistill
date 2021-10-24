@@ -4,7 +4,7 @@ _base_ = [
 ]
 model = dict(
     # pretrained='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window7_224_22k.pth',
-    pretrained='pretrained/swin_large_patch4_window7_224_22k.pth',
+    # pretrained='pretrained/swin_large_patch4_window7_224_22k.pth',
     backbone=dict(
         embed_dim=192,
         depths=[2, 2, 18, 2],
@@ -38,4 +38,4 @@ lr_config = dict(_delete_=True, policy='poly',
 
 # By default, models are trained on 8 GPUs with 2 images per GPU
 data=dict(samples_per_gpu=2)
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.23/swin_large'
+# work_dir = '/apdcephfs/private_inchzhang/shared_info/10.23/swin_large'

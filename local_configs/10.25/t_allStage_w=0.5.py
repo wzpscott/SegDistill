@@ -57,7 +57,7 @@ model = dict(
             },
         },
         {'student_layer':['backbone.block2.1.attn.ATTN','backbone.block2.1.attn.V'],
-        'teacher_layer':['backbone.block2.3.attn.ATTN','backbone.block3.3.attn.V'],
+        'teacher_layer':['backbone.block2.3.attn.ATTN','backbone.block2.3.attn.V'],
         'loss_name':'TeacherRE',
         'loss_config':{
             'weight':weight,

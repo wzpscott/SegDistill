@@ -56,7 +56,7 @@ model = dict(
             'earlystop_config':120000,
             },
         },
-        {'student_layer':['backbone.block1.1.attn.ATTN','backbone.block1.1.attn.V'],
+        {'student_layer':['backbone.block2.1.attn.ATTN','backbone.block2.1.attn.V'],
         'teacher_layer':['backbone.block2.3.attn.ATTN','backbone.block2.3.attn.V'],
         'loss_name':'TeacherRE',
         'loss_config':{

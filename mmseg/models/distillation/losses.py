@@ -293,22 +293,12 @@ class AttentionLoss(nn.Module):
         attn_student  = attn_student.softmax(dim=-1)
         attn_teacher  = attn_teacher.softmax(-1)
         C = C * num_head
+
+
+        print((attn_student @ v_student).transpose(1, 2).shape)
+        print((teacher @ v_student).transpose(1, 2).shape)
         x = (attn_student @ v_student).transpose(1, 2).reshape(B, N, C)
         x_mimic = (attn_teacher @ v_student).transpose(1, 2).reshape(B, N, C)
-        
-        # print(attn_teacher.shape,v_teacher.shape,attn_student.shape,v_student.shape)
-        # x_teacher = (attn_teacher @ v_teacher).transpose(1, 2).reshape(B, N, -1)
-        # import pickle as pkl
-
-        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/student','wb') as f:
-        #     pkl.dump(x.detach().cpu().numpy(),f)
-        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/mimic','wb') as f:
-        #     pkl.dump(x_mimic.detach().cpu().numpy(),f)
-        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/gt','wb') as f:
-        #     pkl.dump(gt.detach().cpu().numpy(),f)
-        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/teacher','wb') as f:
-        #     pkl.dump(x_teacher.detach().cpu().numpy(),f)
-        # raise ValueError('ddddd')
 
         x,x_mimic = self._transform(x),self._transform(x_mimic)
         x = F.log_softmax(x/self.tau,dim=-1)
@@ -392,6 +382,9 @@ class TeacherRE(nn.Module):
         attn_student  = attn_student.softmax(dim=-1)
         attn_teacher  = attn_teacher.softmax(-1)
         C = C * num_head
+
+        # print((attn_student @ v_student).transpose(1, 2).shape)
+        # print((teacher @ v_student).transpose(1, 2).shape)
         x = (attn_teacher @ v_teacher).transpose(1, 2).reshape(B, N, C)
         x_mimic = (attn_student @ v_teacher).transpose(1, 2).reshape(B, N, C)
 
