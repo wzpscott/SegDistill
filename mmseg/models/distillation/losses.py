@@ -60,8 +60,7 @@ class KLDLoss(nn.Module):
             mask = mask & m
         mask = mask.expand(-1,150,-1,-1)
 
-        x_teacher[mask] = x_student[mask].detach().clone()
-        return x_student,x_teacher
+        return mask
 
     def _reshape(self,x):
         # 对任意输入，化为[B,C,W,H]的形式
@@ -124,15 +123,20 @@ class KLDLoss(nn.Module):
         if self.resize_config:
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
         if self.mask_config:
-            x_student,x_teacher = self._mask(x_student,x_teacher,gt_semantic_seg)
+            mask = self._mask(x_student,x_teacher,gt_semantic_seg)
         if self.shift_config:
             x_student,x_teacher = self._shift(x_student,step),self._shift(x_teacher,step)
+            
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
-        
+            if self.mask_config:
+                mask = self._transform(mask)
+            else:
+                mask = torch.zeros_like(x_student).cuda()
+
         x_student = F.log_softmax(x_student/self.tau,dim=-1)
         x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
-        loss = self.weight*self.KLDiv(x_student,x_teacher)
+        loss = self.weight*self.KLDiv(x_student,x_teacher)*(1-mask.float())
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
 
@@ -445,15 +449,16 @@ class MTLoss(KLDLoss):
                 self.weight = 0
             else:
                 self.weight = self.weight_
-        if self.earlystop_config:
-            if step > self.earlystop_config:
-                self.weight = 0
 
         if self.rot:
             i,interval = self.rot
-            if (step-1) // interval == i:
+            if ((step-1) // interval) % 4 == i:
                 self.weight = self.weight_
             else:
+                self.weight = 0
+
+        if self.earlystop_config:
+            if step > self.earlystop_config:
                 self.weight = 0
 
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
@@ -493,7 +498,7 @@ class MTRandomLoss(KLDLoss):
 
         if self.rot:
             i,interval = self.rot
-            if (step-1) // interval == i:
+            if ((step-1) // interval) % 4 == i:
                 self.weight = self.weight_
             else:
                 self.weight = 0
