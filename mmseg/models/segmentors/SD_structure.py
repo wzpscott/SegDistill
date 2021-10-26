@@ -56,6 +56,12 @@ class SDModule(BaseSegmentor):
             _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
             del _
         student_features,teacher_features = self.extractor.student_features,self.extractor.teacher_features
+        # import pickle as pkl
+        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/student_logits','wb') as f:
+        #     pkl.dump(student_features,f)
+        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/teacher_logits','wb') as f:
+        #     pkl.dump(teacher_features,f)
+        # raise ValueError('dddd')
         distillation_loss_dict = self.distillation_loss(student_features,teacher_features,gt_semantic_seg,self.cnt)
 
         loss_dict.update(distillation_loss_dict)

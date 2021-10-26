@@ -1,6 +1,6 @@
 # yapf:disable
 log_config = dict(
-    interval=1000,
+    interval=200,
     hooks=[
         dict(type='TextLoggerHook', by_epoch=False),
         # dict(type='TensorboardLoggerHook')

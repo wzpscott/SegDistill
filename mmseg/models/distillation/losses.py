@@ -31,7 +31,6 @@ class KLDLoss(nn.Module):
         self.weight_ = weight
 
 
-
     def _resize(self,x,gt_semantic_seg):
         x = F.interpolate(
             input=x,
@@ -98,7 +97,12 @@ class KLDLoss(nn.Module):
         if loss_type == 'channel':
             group_size = self.transform_config['group_size']
             B,C,W,H = x.shape
-            x = x.reshape(B,C//group_size,-1)
+            if C%group_size == 0:
+                x = x.reshape(B,C//group_size,-1)
+            else:
+                x_ = x[:,0,:,:].clone().reshape(B,1,W,H)
+                x = torch.cat([x,x_],dim=1)
+                x = x.reshape(B,C//group_size+1,-1)
         elif loss_type == 'spatial':
             kernel_size = self.transform_config['kernel_size']
             stride = self.transform_config['stride']
