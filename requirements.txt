@@ -1,3 +1,4 @@
 -r requirements/optional.txt
 -r requirements/runtime.txt
 -r requirements/tests.txt
+timm = 0.3.2
