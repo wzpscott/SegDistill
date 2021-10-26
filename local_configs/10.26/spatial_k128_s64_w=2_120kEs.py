@@ -53,7 +53,7 @@ model = dict(
             'weight':2,
             'tau':1,
             'reshape_config':'logits',
-            'resize_config':{'mode':'bilinear','align_corners':False},
+            # 'resize_config':{'mode':'bilinear','align_corners':False},
             'mask_config':False,
             'transform_config':{'loss_type':'spatial','kernel_size':128,'stride':64},
             'ff_config':False,
