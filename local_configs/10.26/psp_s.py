@@ -88,8 +88,8 @@ model = dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.4)),
     ),
     distillation = [
-        {'student_layer':'decode_head.bottleneck',
-        'teacher_layer':'decode_head.bottleneck',
+        {'student_layer':'decode_head.conv_seg',
+        'teacher_layer':'decode_head.conv_seg',
         'loss_name':'KLDLoss',
         'loss_config':{
             'weight':2,

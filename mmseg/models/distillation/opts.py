@@ -56,6 +56,11 @@ class Extractor(nn.Module):
                 print(f'student_layer :{name} hooked!!!!')
 
 
+        # for name, module in teacher.named_modules():
+        #     print(name)
+        # raise ValueError('dfs')
+
+
     def hook_fn_forward(self, module, input, output, name, type):
         if self.training == True:
             if type == 'student':
