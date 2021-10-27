@@ -52,19 +52,20 @@ class SDModule(BaseSegmentor):
     def forward_train(self, img, img_metas, gt_semantic_seg):
         self.cnt += 1
         loss_dict = self.student(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
-        with torch.no_grad():
-            _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
-            del _
-        student_features,teacher_features = self.extractor.student_features,self.extractor.teacher_features
-        # import pickle as pkl
-        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/student_logits','wb') as f:
-        #     pkl.dump(student_features,f)
-        # with open('/home/mist/SegformerDistillation/work_dirs/visualization/teacher_logits','wb') as f:
-        #     pkl.dump(teacher_features,f)
-        # raise ValueError('dddd')
-        distillation_loss_dict = self.distillation_loss(student_features,teacher_features,gt_semantic_seg,self.cnt)
+        if self.distillation != []:
+            with torch.no_grad():
+                _ = self.teacher(img, img_metas, return_loss=True, gt_semantic_seg=gt_semantic_seg)
+                del _
+            student_features,teacher_features = self.extractor.student_features,self.extractor.teacher_features
+            # import pickle as pkl
+            # with open('/home/mist/SegformerDistillation/work_dirs/visualization/student_logits','wb') as f:
+            #     pkl.dump(student_features,f)
+            # with open('/home/mist/SegformerDistillation/work_dirs/visualization/teacher_logits','wb') as f:
+            #     pkl.dump(teacher_features,f)
+            # raise ValueError('dddd')
+            distillation_loss_dict = self.distillation_loss(student_features,teacher_features,gt_semantic_seg,self.cnt)
 
-        loss_dict.update(distillation_loss_dict)
+            loss_dict.update(distillation_loss_dict)
 
         
         return loss_dict

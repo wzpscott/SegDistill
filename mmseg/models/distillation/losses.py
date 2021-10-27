@@ -532,3 +532,20 @@ class MTRandomLoss(KLDLoss):
         loss = self.weight*self.KLDiv(x_student,x_teacher)
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
+class MSE(nn.Module):
+    def __init__(self,weight,**kwargs):
+        super().__init__()
+        self.weight = weight
+        self.MSE = nn.MSELoss()
+    def forward(self,attn_student,v_student,attn_teacher,v_teacher,gt,step):
+
+        B,num_head,_,C = v_teacher.shape
+        _,_,N,_ = attn_teacher.shape
+        attn_student  = attn_student.softmax(dim=-1)
+        attn_teacher  = attn_teacher.softmax(-1)
+        C = C * num_head
+
+        x = (attn_teacher @ v_teacher).transpose(1, 2).reshape(B, N, C)
+        x_mimic = (attn_student @ v_teacher).transpose(1, 2).reshape(B, N, C)
+
+        return self.MSE(x,x_mimic)

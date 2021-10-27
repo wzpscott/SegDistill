@@ -22,7 +22,7 @@ def main():
     # test a single image
     result = inference_segmentor(model, args.img)
     # show the results
-    show_result_pyplot(model, args.img, result, get_palette(args.palette))
+    show_result_pyplot(model, args.img, result, get_palette(args.palette),path='demo.png')
 
 
 if __name__ == '__main__':
