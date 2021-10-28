@@ -36,8 +36,7 @@ class SDModule(BaseSegmentor):
                 t_pretrain)['state_dict'],strict=True)
         self.teacher.eval()
 
-        
-        self.log_grad = distillation['log_grad'] if 'log_grad' in distillation else False
+        self.log_grad = True if 'log_grad' in distillation[0] else False
         for param in self.teacher.parameters():
             param.requires_grad = False
 
