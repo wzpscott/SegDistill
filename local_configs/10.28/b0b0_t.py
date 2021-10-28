@@ -10,6 +10,7 @@ model = dict(
     type='SDModule',
     cfg_s=dict(
         type='EncoderDecoder',
+        pretrained='pretrained/mit_b0.pth',
         backbone=dict(
             type='mit_b0',
             style='pytorch'),
@@ -29,11 +30,11 @@ model = dict(
     cfg_t=dict(
         type='EncoderDecoder',
         backbone=dict(
-            type='mit_b3',
+            type='mit_b0',
             style='pytorch'),
         decode_head=dict(
             type='SegFormerHead',
-            in_channels=[64, 128, 320, 512],
+            in_channels=[32, 64, 160, 256],
             in_index=[0, 1, 2, 3],
             feature_strides=[4, 8, 16, 32],
             channels=128,
@@ -41,66 +42,13 @@ model = dict(
             num_classes=150,
             norm_cfg=norm_cfg,
             align_corners=False,
-            decoder_params=dict(embed_dim=768),
+            decoder_params=dict(embed_dim=256),
             loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
     ),
     distillation = [
-        # {'student_layer':['backbone.block1.1.attn.ATTN','backbone.block1.1.attn.V'],
-        # 'teacher_layer':['backbone.block1.2.attn.ATTN','backbone.block1.2.attn.V'],
-        # 'loss_name':'TeacherRE',
-        # 'loss_config':{
-        #     'weight':weight,
-        #     'tau':1,
-        #     'transform_config':{'loss_type':'channel','group_size':1},
-        #     'earlystop_config':120000,
-        #     },
-        # },
-        # {'student_layer':['backbone.block2.1.attn.ATTN','backbone.block2.1.attn.V'],
-        # 'teacher_layer':['backbone.block2.3.attn.ATTN','backbone.block2.3.attn.V'],
-        # 'loss_name':'TeacherRE',
-        # 'loss_config':{
-        #     'weight':weight,
-        #     'tau':1,
-        #     'transform_config':{'loss_type':'channel','group_size':1},
-        #     'earlystop_config':120000,
-        #     },
-        # },
-        # {'student_layer':['backbone.block3.1.attn.ATTN','backbone.block3.1.attn.V'],
-        # 'teacher_layer':['backbone.block3.5.attn.ATTN','backbone.block3.5.attn.V'],
-        # 'loss_name':'TeacherRE',
-        # 'loss_config':{
-        #     'weight':weight,
-        #     'tau':1,
-        #     'transform_config':{'loss_type':'channel','group_size':1},
-        #     'earlystop_config':120000,
-        #     },
-        # },
-        # {'student_layer':['backbone.block4.1.attn.ATTN','backbone.block4.1.attn.V'],
-        # 'teacher_layer':['backbone.block4.2.attn.ATTN','backbone.block4.2.attn.V'],
-        # 'loss_name':'TeacherRE',
-        # 'loss_config':{
-        #     'weight':weight,
-        #     'tau':1,
-        #     'transform_config':{'loss_type':'channel','group_size':1},
-        #     'earlystop_config':120000,
-        #     },
-        # },
-        # {'student_layer':'decode_head.linear_pred',
-        # 'teacher_layer':'decode_head.linear_pred',
-        # 'loss_name':'KLDLoss',
-        # 'loss_config':{
-        #     'weight':2,
-        #     'tau':1,
-        #     'reshape_config':'logits',
-        #     'resize_config':{'mode':'bilinear','align_corners':False},
-        #     'mask_config':False,
-        #     'transform_config':{'loss_type':'channel','group_size':10},
-        #     'ff_config':False,
-        #     },
-        # },
         {'student_layer':['backbone.block1.1.attn.ATTN','backbone.block1.1.attn.V'],
         'teacher_layer':['backbone.block1.2.attn.ATTN','backbone.block1.2.attn.V'],
-        'loss_name':'MSE',
+        'loss_name':'TeacherRE',
         'loss_config':{
             'weight':weight,
             'tau':1,
@@ -110,7 +58,7 @@ model = dict(
         },
         {'student_layer':['backbone.block2.1.attn.ATTN','backbone.block2.1.attn.V'],
         'teacher_layer':['backbone.block2.3.attn.ATTN','backbone.block2.3.attn.V'],
-        'loss_name':'MSE',
+        'loss_name':'TeacherRE',
         'loss_config':{
             'weight':weight,
             'tau':1,
@@ -120,7 +68,7 @@ model = dict(
         },
         {'student_layer':['backbone.block3.1.attn.ATTN','backbone.block3.1.attn.V'],
         'teacher_layer':['backbone.block3.5.attn.ATTN','backbone.block3.5.attn.V'],
-        'loss_name':'MSE',
+        'loss_name':'TeacherRE',
         'loss_config':{
             'weight':weight,
             'tau':1,
@@ -130,14 +78,28 @@ model = dict(
         },
         {'student_layer':['backbone.block4.1.attn.ATTN','backbone.block4.1.attn.V'],
         'teacher_layer':['backbone.block4.2.attn.ATTN','backbone.block4.2.attn.V'],
-        'loss_name':'MSE',
+        'loss_name':'TeacherRE',
         'loss_config':{
-            'weight':'MSE',
+            'weight':weight,
             'tau':1,
             'transform_config':{'loss_type':'channel','group_size':1},
             'earlystop_config':120000,
             },
         },
+        {'student_layer':'decode_head.linear_pred',
+        'teacher_layer':'decode_head.linear_pred',
+        'loss_name':'KLDLoss',
+        'loss_config':{
+            'weight':2,
+            'tau':1,
+            'reshape_config':'logits',
+            'resize_config':{'mode':'bilinear','align_corners':False},
+            'mask_config':False,
+            'transform_config':{'loss_type':'channel','group_size':10},
+            'ff_config':False,
+            },
+        },
+        
         {'student_layer':'decode_head.linear_pred',
         'teacher_layer':'decode_head.linear_pred',
         'loss_name':'KLDLoss',
@@ -168,9 +130,9 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.27/t_allStage_w=1_noImn'
+work_dir = '/apdcephfs/private_inchzhang/shared_info/10.28/b0b0_t'
 
 data = dict(samples_per_gpu=2)
-evaluation = dict(interval=16000, metric='mIoU') 
+evaluation = dict(interval=2000, metric='mIoU') 
 
-# resume_from = ''
+resume_from = work_dir+'/latest.pth'

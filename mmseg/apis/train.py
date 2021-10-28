@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
-from mmcv.runner import build_optimizer, build_runner
+from mmcv.runner import build_optimizer, build_runner, load_checkpoint
 
 from mmseg.core import DistEvalHook, EvalHook
 from mmseg.datasets import build_dataloader, build_dataset
@@ -37,6 +37,7 @@ def train_segmentor(model,
                     timestamp=None,
                     meta=None):
     """Launch segmentor training."""
+
     logger = get_root_logger(cfg.log_level)
 
     # prepare data loaders
@@ -109,7 +110,19 @@ def train_segmentor(model,
         runner.register_hook(eval_hook(val_dataloader, **eval_cfg))
 
     if cfg.resume_from:
-        runner.resume(cfg.resume_from)
+        try:
+            runner.resume(cfg.resume_from)
+            device_id = torch.cuda.current_device()
+            checkpoint = load_checkpoint(
+                model,
+                cfg.resume_from,
+                map_location=lambda storage, loc: storage.cuda(device_id),
+                strict=False,
+                logger=logger,
+                revise_keys=[(r'^module\.', '')])
+            model.cnt = checkpoint['meta']['iter']
+        except:
+            print('unsucessful resume, train from scratch...')
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
     runner.run(data_loaders, cfg.workflow)

@@ -19,6 +19,7 @@ class BaseSegmentor(nn.Module):
     def __init__(self):
         super(BaseSegmentor, self).__init__()
         self.fp16_enabled = False
+        self.cnt = 0
 
     @property
     def with_neck(self):
@@ -197,6 +198,7 @@ class BaseSegmentor(nn.Module):
                    if 'loss' in _key)
 
         log_vars['loss'] = loss
+        
         for loss_name, loss_value in log_vars.items():
             # reduce loss when distributed training
             if dist.is_available() and dist.is_initialized():

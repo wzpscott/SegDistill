@@ -46,3 +46,4 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=16000, metric='mIoU')
+resume_from = '/home/mist/SegformerDistillation/pretrained/segformer.b1.512x512.ade.160k.pth'

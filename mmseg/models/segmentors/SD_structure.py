@@ -35,6 +35,9 @@ class SDModule(BaseSegmentor):
         self.teacher.load_state_dict(torch.load(
                 t_pretrain)['state_dict'],strict=True)
         self.teacher.eval()
+
+        
+        self.log_grad = distillation['log_grad'] if 'log_grad' in distillation else False
         for param in self.teacher.parameters():
             param.requires_grad = False
 
@@ -69,6 +72,60 @@ class SDModule(BaseSegmentor):
 
         
         return loss_dict
+
+    def get_grads(self,loss):
+        loss.backward(retain_graph=True)
+        params = self.student.parameters()
+        # print([i for i in params])
+        params = list(
+            filter(lambda p: p.requires_grad and p.grad is not None, params))
+        params = [i.grad.flatten().clone() for i in params]
+        g = torch.cat(params)
+
+        # for param in self.student.named_parameters():
+        #     # print(param[0])
+        #     g = []
+        #     if 'decode_head.linear_pred' in param[0]:
+        #         g.append(param[1].grad.flatten().clone())
+
+        self.student.zero_grad()
+        return g
+
+    def _parse_losses(self,losses):
+        log_vars = OrderedDict()
+        for loss_name, loss_value in losses.items():
+            if isinstance(loss_value, torch.Tensor):
+                log_vars[loss_name] = loss_value.mean()
+            elif isinstance(loss_value, list):
+                log_vars[loss_name] = sum(_loss.mean() for _loss in loss_value)
+            else:
+                raise TypeError(
+                    f'{loss_name} is not a tensor or list of tensors')
+
+        loss = sum(_value for _key, _value in log_vars.items()
+                   if 'loss' in _key)
+
+        if self.log_grad:
+            for _key, _value in log_vars.items():
+                if 'loss_seg' in _key:
+                    loss_seg = log_vars[_key]
+                elif 'channel' in _key:
+                    loss_distill = log_vars[_key]
+            grad_seg = self.get_grads(loss_seg)
+            grad_distill = self.get_grads(loss_distill)
+            cos = torch.sum(grad_seg*grad_distill)/(torch.norm(grad_seg)*torch.norm(grad_distill))
+            deg = torch.acos(cos)
+            log_vars['deg'] = deg*180/3.1416
+
+        log_vars['loss'] = loss
+        for loss_name, loss_value in log_vars.items():
+            # reduce loss when distributed training
+            if dist.is_available() and dist.is_initialized():
+                loss_value = loss_value.data.clone()
+                dist.all_reduce(loss_value.div_(dist.get_world_size()))
+            log_vars[loss_name] = loss_value.item()
+
+        return loss, log_vars
 
     def whole_inference(self, img, img_meta, rescale):
         """Inference with full image."""
