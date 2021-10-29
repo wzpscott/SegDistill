@@ -137,7 +137,6 @@ class KLDLoss(nn.Module):
                 mask = self._transform(mask)
             else:
                 mask = torch.zeros_like(x_student).cuda()
-
         x_student = F.log_softmax(x_student/self.tau,dim=-1)
         x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
         loss = self.weight*self.KLDiv(x_student,x_teacher)*(1-mask.float())
