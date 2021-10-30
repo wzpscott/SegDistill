@@ -114,7 +114,7 @@ class KLDLoss(nn.Module):
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
         if self.warmup_config:
             if step < self.warmup_config:
-                self.weight = step/self.warmup_config
+                self.weight = 0
             else:
                 self.weight = self.weight_
         if self.earlystop_config:
