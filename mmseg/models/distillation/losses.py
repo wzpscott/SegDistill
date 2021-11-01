@@ -83,10 +83,8 @@ class KLDLoss(nn.Module):
 
     def _shift(self,x,step):
         B,C,W,H = x.shape
-        stride = step % C
-        x1 = x[:,:stride,:,:]
-        x2 = x[:,stride:,:,:]
-        x = torch.cat([x2,x1],dim=1).contiguous()
+        shift_size = step
+        shifted_x = torch.roll(x, shifts=(-shift_size, -shift_size), dims=(2, 3))
         return x
 
     def _ff(self,x):
@@ -312,15 +310,15 @@ class AttentionLoss(nn.Module):
 
 
 class StudentRE(nn.Module):
-    def __init__(self,weight,tau,transform_config,earlystop_config,**kwargs):
+    def __init__(self,weight,tau,transform_config,proj,earlystop_config,**kwargs):
         super().__init__()
         self.weight = weight
         self.weight_ = weight
         self.tau = tau
         self.transform_config = transform_config
         self.earlystop_config = earlystop_config if earlystop_config else False
-
         self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+        self.proj_name = proj
 
     def _transform(self,x):
         loss_type = self.transform_config['loss_type']
@@ -332,7 +330,7 @@ class StudentRE(nn.Module):
         elif loss_type == 'spatial':
             pass
         return x
-    def forward(self,attn_student,v_student,attn_teacher,v_teacher,gt,step):
+    def forward(self,attn_student,v_student,attn_teacher,v_teacher,student,teacher,gt,step):
 
         if self.earlystop_config:
             if step > self.earlystop_config:
@@ -341,26 +339,40 @@ class StudentRE(nn.Module):
         B,num_head,_,C = v_student.shape
         _,_,N,_ = attn_student.shape
         attn_student  = attn_student.softmax(dim=-1)
-        attn_teacher  = attn_teacher.softmax(-1)
+        attn_teacher  = attn_teacher.softmax(dim=-1)
         C = C * num_head
+
         x = (attn_student @ v_student).transpose(1, 2).reshape(B, N, C)
         x_mimic = (attn_teacher @ v_student).transpose(1, 2).reshape(B, N, C)
 
-        x,x_mimic = self._transform(x),self._transform(x_mimic)
-        x = F.log_softmax(x/self.tau,dim=-1)
-        x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
-        loss = self.weight*self.KLDiv(x,x_mimic)
-        loss = loss/(x.numel()/x.shape[-1])
+
+        for name,v in student.named_parameters():
+            if self.proj_name in name:
+                if 'weight' in name:
+                    W = v
+                else:
+                    b = v
+
+        # x,x_mimic = self._transform(x),self._transform(x_mimic)
+        x = F.linear(x, W, b)
+        x_mimic = F.linear(x_mimic, W, b)
+        # x = F.log_softmax(x/self.tau,dim=-1)
+        # x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
+        # loss = self.weight*self.KLDiv(x,x_mimic)
+        # loss = loss/(x.numel()/x.shape[-1])
+        loss = self.weight*torch.mean((x-x_mimic)**2)
         return loss
 
 class TeacherRE(nn.Module):
-    def __init__(self,weight,tau,transform_config,earlystop_config,**kwargs):
+    def __init__(self,weight,tau,transform_config,proj,earlystop_config,**kwargs):
         super().__init__()
         self.weight = weight
         self.weight_ = weight
         self.tau = tau
         self.transform_config = transform_config
         self.earlystop_config = earlystop_config if earlystop_config else False
+
+        self.proj_name = proj
 
         self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
 
@@ -374,7 +386,7 @@ class TeacherRE(nn.Module):
         elif loss_type == 'spatial':
             pass
         return x
-    def forward(self,attn_student,v_student,attn_teacher,v_teacher,gt,step):
+    def forward(self,attn_student,v_student,attn_teacher,v_teacher,student,teacher,gt,step):
 
         if self.earlystop_config:
             if step > self.earlystop_config:
@@ -386,16 +398,26 @@ class TeacherRE(nn.Module):
         attn_teacher  = attn_teacher.softmax(-1)
         C = C * num_head
 
+        for name,v in teacher.named_parameters():
+            if self.proj_name in name:
+                if 'weight' in name:
+                    W = v
+                else:
+                    b = v
+
         # print((attn_student @ v_student).transpose(1, 2).shape)
         # print((teacher @ v_student).transpose(1, 2).shape)
         x = (attn_teacher @ v_teacher).transpose(1, 2).reshape(B, N, C)
         x_mimic = (attn_student @ v_teacher).transpose(1, 2).reshape(B, N, C)
+        x = F.linear(x, W, b)
+        x_mimic = F.linear(x_mimic, W, b)
+        loss = self.weight * torch.mean((x-x_mimic)**2)
+        # x,x_mimic = self._transform(x),self._transform(x_mimic)
+        # x = F.log_softmax(x/self.tau,dim=-1)
+        # x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
+        # loss = self.weight*self.KLDiv(x,x_mimic)
+        # loss = loss/(x.numel()/x.shape[-1])
 
-        x,x_mimic = self._transform(x),self._transform(x_mimic)
-        x = F.log_softmax(x/self.tau,dim=-1)
-        x_mimic = F.softmax(x_mimic/self.tau,dim=-1)
-        loss = self.weight*self.KLDiv(x,x_mimic)
-        loss = loss/(x.numel()/x.shape[-1])
         return loss
 
 class FlattenLoss(nn.Module):
@@ -531,20 +553,24 @@ class MTRandomLoss(KLDLoss):
         loss = self.weight*self.KLDiv(x_student,x_teacher)
         loss = loss/(x_student.numel()/x_student.shape[-1])
         return loss
+
 class MSE(nn.Module):
-    def __init__(self,weight,**kwargs):
+    def __init__(self,weight,tau,\
+        reshape_config=None,resize_config=None,mask_config=None,transform_config=None,ff_config=None,\
+        earlystop_config=None,shift_config=None,warmup_config=0):
         super().__init__()
         self.weight = weight
+        self.earlystop_config = earlystop_config
+        self.ff = nn.Conv1d(**ff_config,kernel_size=1).cuda() if ff_config else False
         self.MSE = nn.MSELoss()
-    def forward(self,attn_student,v_student,attn_teacher,v_teacher,gt,step):
+    def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+        x_student = x_student.transpose(1,2)
+        x_student = self.ff(x_student)
+        x_student = x_student.transpose(1,2)
+        loss = self.weight*torch.mean((x_student-x_teacher)**2)
+        return loss
 
-        B,num_head,_,C = v_teacher.shape
-        _,_,N,_ = attn_teacher.shape
-        attn_student  = attn_student.softmax(dim=-1)
-        attn_teacher  = attn_teacher.softmax(-1)
-        C = C * num_head
-
-        x = (attn_teacher @ v_teacher).transpose(1, 2).reshape(B, N, C)
-        x_mimic = (attn_student @ v_teacher).transpose(1, 2).reshape(B, N, C)
-
-        return self.MSE(x,x_mimic)
+        

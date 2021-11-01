@@ -66,7 +66,8 @@ class SDModule(BaseSegmentor):
             # with open('/home/mist/SegformerDistillation/work_dirs/visualization/teacher_logits','wb') as f:
             #     pkl.dump(teacher_features,f)
             # raise ValueError('dddd')
-            distillation_loss_dict = self.distillation_loss(student_features,teacher_features,gt_semantic_seg,self.cnt)
+            distillation_loss_dict = self.distillation_loss(student_features,teacher_features,gt_semantic_seg,self.cnt,\
+                                    self.student,self.teacher)
 
             loss_dict.update(distillation_loss_dict)
 

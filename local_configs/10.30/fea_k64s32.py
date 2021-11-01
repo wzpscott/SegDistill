@@ -56,7 +56,7 @@ model = dict(
             'resize_config':{'mode':'bilinear','align_corners':False},
             'mask_config':False,
             'transform_config':{'loss_type':'spatial','kernel_size':64,'stride':32},
-            'ff_config':{'in_channels':256, 'out_channels':768},
+            # 'ff_config':{'in_channels':256, 'out_channels':768},
             'earlystop_config':112000,
             },
         },
