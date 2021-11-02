@@ -43,7 +43,7 @@ model = dict(
             norm_cfg=norm_cfg,
             align_corners=False,
             decoder_params=dict(embed_dim=768),
-            loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
+            loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
     ),
     distillation = [
         {'student_layer':'decode_head.linear_pred',
@@ -53,10 +53,53 @@ model = dict(
             'weight':2,
             'tau':1,
             'reshape_config':'logits',
+            'mask_config':['TfSr'],
+            'transform_config':{'loss_type':'spatial','kernel_size':32,'stride':32},
+            'ff_config':False,
+            'earlystop_config':20000,
+            },
+        },
+        {'student_layer':'decode_head.linear_pred',
+        'teacher_layer':'decode_head.linear_pred',
+        'loss_name':'KLDLoss',
+        'loss_config':{
+            'weight':2,
+            'tau':1,
+            'reshape_config':'logits',
             'resize_config':{'mode':'bilinear','align_corners':False},
-            'mask_config':['TfSr'],#['TrSr','TrSf','TfSr','TfSf','Bg'],
+            'mask_config':['TfSr'],
             'transform_config':{'loss_type':'channel','group_size':10},
             'ff_config':False,
+            'earlystop_config':20000,
+            },
+        },
+        {'student_layer':'decode_head.linear_pred',
+        'teacher_layer':'decode_head.linear_pred',
+        'loss_name':'KLDLoss',
+        'loss_config':{
+            'weight':2,
+            'tau':1,
+            'reshape_config':'logits',
+            'mask_config':['TrSr','TrSf','TfSr','Bg'],
+            'transform_config':{'loss_type':'spatial','kernel_size':32,'stride':32},
+            'ff_config':False,
+            'warmup_config':20000,
+            'earlystop_config':150000,
+            },
+        },
+        {'student_layer':'decode_head.linear_pred',
+        'teacher_layer':'decode_head.linear_pred',
+        'loss_name':'KLDLoss',
+        'loss_config':{
+            'weight':2,
+            'tau':1,
+            'reshape_config':'logits',
+            'resize_config':{'mode':'bilinear','align_corners':False},
+            'mask_config':['TrSr','TrSf','TfSr','Bg'],
+            'transform_config':{'loss_type':'channel','group_size':10},
+            'ff_config':False,
+            'warmup_config':20000,
+            'earlystop_config':150000,
             },
         },
     ],
@@ -76,8 +119,7 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-work_dir = '/apdcephfs/private_inchzhang/shared_info/10.30/mask'
-
 data = dict(samples_per_gpu=2)
-evaluation = dict(interval=16000, metric='mIoU')  
-# resume_from = ''
+evaluation = dict(interval=2000, metric='mIoU')  
+work_dir = '/apdcephfs/private_inchzhang/shared_info/11.2/m_20k_es'
+resume_from = work_dir+'/latest.pth'

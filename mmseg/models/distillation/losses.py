@@ -14,7 +14,7 @@ class KLDLoss(nn.Module):
         super().__init__()
         self.weight = weight
         self.tau = tau
-        self.KLDiv = torch.nn.KLDivLoss(reduction='sum')
+        self.KLDiv = torch.nn.KLDivLoss(reduction='none')
 
         self.reshape_config = reshape_config if reshape_config else False
         self.resize_config = resize_config if resize_config else False
@@ -48,15 +48,20 @@ class KLDLoss(nn.Module):
                 mode='nearest'
             )
         
-        mask_tm = (teacher_pd != gt_semantic_seg).bool() # teacher预测错误的pixel
-        mask_st = (student_pd == gt_semantic_seg).bool() # student预测正确的pixel
-        mask_bg = (gt_semantic_seg == 255).bool() # 标签为background的pixel
-        masks = {'mask_tm':mask_tm,'mask_st':mask_st,'mask_bg':mask_bg}
+        Tr = (teacher_pd == gt_semantic_seg).bool() # teacher预测正确的pixel
+        Sr = (student_pd == gt_semantic_seg).bool() # student预测正确的pixel
+        Bg = (gt_semantic_seg == 255).bool() # 标签为background的pixel
+
+        TrSr = Tr&Sr
+        TrSf = Tr&(~Sr)
+        TfSr = (~Tr)&Sr
+        TfSf = (~Tr)&(~Sr)&(~Bg)
+        masks = {'TrSr':TrSr,'TrSf':TrSf,'TfSr':TfSr,'TfSf':TfSf,'Bg':Bg}
 
         masks_to_apply = [masks[mask_name] for mask_name in self.mask_config] # 使用的mask
         mask = masks_to_apply[0]
         for m in masks_to_apply:
-            mask = mask & m
+            mask = mask | m
         mask = mask.expand(-1,150,-1,-1)
 
         return mask
@@ -137,8 +142,9 @@ class KLDLoss(nn.Module):
                 mask = torch.zeros_like(x_student).cuda()
         x_student = F.log_softmax(x_student/self.tau,dim=-1)
         x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
+
         loss = self.weight*self.KLDiv(x_student,x_teacher)*(1-mask.float())
-        loss = loss/(x_student.numel()/x_student.shape[-1])
+        loss = loss.sum()/(x_student.numel()/x_student.shape[-1])
         return loss
 
 class ShiftChannelLoss(KLDLoss):
