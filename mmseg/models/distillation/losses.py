@@ -23,6 +23,7 @@ class KLDLoss(nn.Module):
 
         self.earlystop_config = earlystop_config if earlystop_config else False
         self.shift_config = shift_config if shift_config else False
+        self.shuffle_config = shuffle_config if shuffle_config else False
 
         self.ff = nn.Conv2d(**ff_config,kernel_size=1).cuda() if ff_config else False
         
@@ -91,6 +92,12 @@ class KLDLoss(nn.Module):
         shift_size = step
         shifted_x = torch.roll(x, shifts=(-shift_size, -shift_size), dims=(2, 3))
         return x
+    def _shuffle(self,x_student,x_teacher):
+        B,C,W,H = x_student.shape
+        idx = torch.randperm(C)
+        x_student = x_student[:,idx,:,:].contiguous()
+        x_teacher = x_teacher[:,idx,:,:].contiguous()
+        return x_student,x_teacher
 
     def _ff(self,x):
         return self.ff(x)
@@ -133,6 +140,8 @@ class KLDLoss(nn.Module):
             mask = self._mask(x_student,x_teacher,gt_semantic_seg)
         if self.shift_config:
             x_student,x_teacher = self._shift(x_student,step),self._shift(x_teacher,step)
+        if self.shuffle_config:
+            x_student,x_teacher = self._shuffle(x_student,x_teacher)
             
         if self.transform_config:
             x_student,x_teacher = self._transform(x_student),self._transform(x_teacher)
@@ -182,7 +191,7 @@ class ShuffleChannelLoss(KLDLoss):
         reshape_config,resize_config,mask_config,transform_config,ff_config,\
         earlystop_config=None,shuffle_config=None):
         self.weight_ = weight
-        self.shuffle_config = shuffle_config
+        self.shuffle_config = 1
         super().__init__(weight,tau,reshape_config,resize_config,mask_config,transform_config,ff_config,earlystop_config)
     def _shuffle(self,x,step):
         B,N,G = x.shape
@@ -579,4 +588,82 @@ class MSE(nn.Module):
         loss = self.weight*torch.mean((x_student-x_teacher)**2)
         return loss
 
+
+
+
+
+class Mimic(nn.Module):
+    def __init__(self,weight,tau,\
+        reshape_config=None,resize_config=None,mask_config=None,transform_config=None,ff_config=None,\
+        earlystop_config=None,shift_config=None,warmup_config=0):
+        super().__init__()
+        self.weight = weight
+        self.earlystop_config = earlystop_config
+        self.ff = nn.Conv1d(**ff_config,kernel_size=1).cuda() if ff_config else False
+        self.MSE = nn.MSELoss()
+    def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        if self.earlystop_config:
+            if step > self.earlystop_config:
+                self.weight = 0
+        x_student = x_student.transpose(1,2)
+        x_student = self.ff(x_student)
+        x_student = x_student.transpose(1,2)
+        loss = self.weight*torch.mean((x_student-x_teacher)**2)
+        return loss
+
+# class IFVD(nn.Module):
+#     def __init__(self,weight,tau,\
+#         reshape_config=None,resize_config=None,mask_config=None,transform_config=None,ff_config=None,\
+#         earlystop_config=None,shift_config=None,warmup_config=0):
+#         super().__init__()
+#         self.weight = weight
+#         self.earlystop_config = earlystop_config
+#         self.ff = nn.Conv1d(**ff_config,kernel_size=1).cuda() if ff_config else False
+
+#     def avg_pooling(self,x):
+
+
+class IFVD(nn.Module):
+    def __init__(self, classes=150,**kwargs):
+        super().__init__()
+        self.num_classes = classes
+
+    def forward(self, preds_S, preds_T, target,step):
+        feat_S = preds_S
+        feat_T = preds_T
+        feat_T.detach()
+        size_f = (feat_S.shape[2], feat_S.shape[3])
+        tar_feat_S = nn.Upsample(size_f, mode='nearest')(target.float()).expand(feat_S.size())
+        tar_feat_T = nn.Upsample(size_f, mode='nearest')(target.float()).expand(feat_T.size())
+        center_feat_S = feat_S.clone()
+        center_feat_T = feat_T.clone()
+        for i in range(self.num_classes):
+          mask_feat_S = (tar_feat_S == i).float()
+          mask_feat_T = (tar_feat_T == i).float()
+          center_feat_S = (1 - mask_feat_S) * center_feat_S + mask_feat_S * ((mask_feat_S * feat_S).sum(-1).sum(-1) / (mask_feat_S.sum(-1).sum(-1) + 1e-6)).unsqueeze(-1).unsqueeze(-1)
+          center_feat_T = (1 - mask_feat_T) * center_feat_T + mask_feat_T * ((mask_feat_T * feat_T).sum(-1).sum(-1) / (mask_feat_T.sum(-1).sum(-1) + 1e-6)).unsqueeze(-1).unsqueeze(-1)
+
+        # cosinesimilarity along C
+        cos = nn.CosineSimilarity(dim=1)
+        pcsim_feat_S = cos(feat_S, center_feat_S)
+        pcsim_feat_T = cos(feat_T, center_feat_T)
+
+        # mseloss
+        mse = nn.MSELoss()
+        loss = mse(pcsim_feat_S, pcsim_feat_T)
+        return loss
+
+
+class AT(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self,x_student, x_teacher, gt,step):
+        x_student = x_student.sum(dim=1)
+        x_teacher = x_teacher.sum(dim=1)
+
+        mse = nn.MSELoss()
+        loss = mse(x_student, x_student)
+        return loss
+
+    
         

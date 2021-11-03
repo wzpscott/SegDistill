@@ -58,6 +58,8 @@ class Extractor(nn.Module):
 
         # for name, module in teacher.named_modules():
         #     print(name)
+        # for name, module in student.named_modules():
+        #     print(name)
         # raise ValueError('dfs')
 
 
