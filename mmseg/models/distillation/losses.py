@@ -10,7 +10,7 @@ from mmseg.ops import resize
 class KLDLoss(nn.Module):
     def __init__(self,weight,tau,\
         reshape_config=None,resize_config=None,mask_config=None,transform_config=None,ff_config=None,\
-        earlystop_config=None,shift_config=None,warmup_config=0):
+        earlystop_config=None,shift_config=None,shuffle_config=None,warmup_config=0):
         super().__init__()
         self.weight = weight
         self.tau = tau
