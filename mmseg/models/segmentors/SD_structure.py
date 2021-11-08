@@ -53,6 +53,9 @@ class SDModule(BaseSegmentor):
 
         self.cnt = 0
 
+    def my_resume(self,iter):
+        self.cnt = iter
+        print(f'resume with cnt {iter}')
 
     def forward_train(self, img, img_metas, gt_semantic_seg):
         self.cnt += 1
@@ -64,11 +67,19 @@ class SDModule(BaseSegmentor):
             student_features,teacher_features = self.extractor.student_features,self.extractor.teacher_features
             
             # import pickle as pkl
-            # with open('/home/mist/SegformerDistillation/work_dirs/visualization/student_logits','wb') as f:
-            #     pkl.dump(student_features,f)
-            # with open('/home/mist/SegformerDistillation/work_dirs/visualization/teacher_logits','wb') as f:
-            #     pkl.dump(teacher_features,f)
-            # raise ValueError('dddd')
+            # if self.cnt<20100 and self.cnt>20000:
+            #     with open(f'/home/mist/SegformerDistillation/visualization/imgs/{self.cnt}.pkl','wb') as f:
+            #         pkl.dump(img,f)
+            #     with open(f'/home/mist/SegformerDistillation/visualization/gts/{self.cnt}.pkl','wb') as f:
+            #         pkl.dump(gt_semantic_seg,f)
+            #     with open(f'/home/mist/SegformerDistillation/visualization/student_logits/{self.cnt}.pkl','wb') as f:
+            #         pkl.dump(student_features,f)
+            #     with open(f'/home/mist/SegformerDistillation/visualization/teacher_logits/{self.cnt}.pkl','wb') as f:
+            #         pkl.dump(teacher_features,f)
+            # elif self.cnt <= 20000:
+            #     pass
+            # else:
+            #     raise ValueError('dddd')
             distillation_loss_dict = self.distillation_loss(student_features,teacher_features,gt_semantic_seg,self.cnt,\
                                     self.student,self.teacher)
 

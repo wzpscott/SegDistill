@@ -10,7 +10,7 @@ from mmseg.ops import resize
 class KLDLoss(nn.Module):
     def __init__(self,weight,tau,\
         reshape_config=None,resize_config=None,mask_config=None,transform_config=None,ff_config=None,\
-        earlystop_config=None,shift_config=None,shuffle_config=None,warmup_config=0):
+        earlystop_config=None,shift_config=None,shuffle_config=None,warmup_config=0,edt_config=False):
         super().__init__()
         self.weight = weight
         self.tau = tau
@@ -25,6 +25,7 @@ class KLDLoss(nn.Module):
         self.shift_config = shift_config if shift_config else False
         self.shuffle_config = shuffle_config if shuffle_config else False
 
+        self.edt = edt_config if edt_config else False
         self.ff = nn.Conv2d(**ff_config,kernel_size=1).cuda() if ff_config else False
         
         self.warmup_config = warmup_config if warmup_config > 0 else False
@@ -130,6 +131,9 @@ class KLDLoss(nn.Module):
         if self.earlystop_config:
             if step > self.earlystop_config:
                 self.weight = 0
+
+        if self.edt:
+            self.weight = self.weight_*(0.1)**(step/160000)
 
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
