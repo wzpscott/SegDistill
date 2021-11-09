@@ -127,7 +127,10 @@ def train_segmentor(model,
         runner.register_hook(eval_hook(val_dataloader, **eval_cfg))
 
     if cfg.resume_from:
-        runner.resume(cfg.resume_from)
+        try:
+            runner.resume(cfg.resume_from)
+        except:
+            print('unsuccessful resume....')
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
     runner.run(data_loaders, cfg.workflow)
