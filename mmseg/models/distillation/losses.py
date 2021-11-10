@@ -128,13 +128,12 @@ class KLDLoss(nn.Module):
                 self.weight = step/self.warmup_config*self.weight_
             else:
                 self.weight = self.weight_
+                self.warmup_config = False
         if self.earlystop_config:
             if step > self.earlystop_config and step < self.earlystop_config+10000:
                 self.weight = (self.earlystop_config+10000-step)/10000*self.weight_
             elif step > self.earlystop_config+9999:
                 self.weight = 0
-            else:
-                self.weight = self.weight_
 
         if self.edt:
             self.weight = self.weight_*(0.01)**(step/160000)
@@ -160,8 +159,8 @@ class KLDLoss(nn.Module):
         x_student = F.log_softmax(x_student/self.tau,dim=-1)
         x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
 
-        loss = self.weight*self.KLDiv(x_student,x_teacher)*(1-mask.float())
-        loss = loss.sum()/(x_student.numel()/x_student.shape[-1])
+        loss = self.KLDiv(x_student,x_teacher)*(1-mask.float())
+        loss = self.weight*loss.sum()/(x_student.numel()/x_student.shape[-1])
         return loss
 
 class ShiftChannelLoss(KLDLoss):
