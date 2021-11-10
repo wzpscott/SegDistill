@@ -109,8 +109,6 @@ s_num = '0'
 cfg_t = eval(f'b{t_num}_cfg')
 cfg_s = eval(f'b{s_num}_cfg')
 c = 10
-w = 2
-t = 4
 
 model = dict(
     type='SDModule',
@@ -121,8 +119,8 @@ model = dict(
         'teacher_layer':'decode_head.linear_pred',
         'loss_name':'KLDLoss',
         'loss_config':{
-            'weight':w,
-            'tau':t,
+            'weight':3,
+            'tau':2,
             'reshape_config':'logits',
             'resize_config':{'mode':'bilinear','align_corners':False},
             'mask_config':False,
@@ -150,9 +148,5 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=2)
 evaluation = dict(interval=2000, metric='mIoU')  
-# work_dir = f'/apdcephfs/private_inchzhang/shared_info/11.8/c_w={w}_t={t}'
-work_dir = f'work_dirs/11.8/c_w={w}_t={t}'
+work_dir = f'/apdcephfs/private_inchzhang/shared_info/11.10/b{t_num}b{s_num}'
 resume_from = work_dir+'/latest.pth'
-
-
-checkpoint_config = dict(by_epoch=False, interval=100)

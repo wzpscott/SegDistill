@@ -121,11 +121,11 @@ data = dict(
                 ])
         ]))
 log_config = dict(
-    interval=1000, hooks=[dict(type='TextLoggerHook', by_epoch=False)])
+    interval=200, hooks=[dict(type='TextLoggerHook', by_epoch=False)])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 load_from = None
-resume_from = None
+resume_from = '/apdcephfs/private_inchzhang/shared_info/11.8/es140k/latest.pth'
 workflow = [('train', 1)]
 cudnn_benchmark = True
 optimizer = dict(
@@ -149,8 +149,131 @@ lr_config = dict(
     by_epoch=False)
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=4000, max_keep_ckpts=1)
-evaluation = dict(interval=16000, metric='mIoU')
+evaluation = dict(interval=2000, metric='mIoU')
 norm_cfg = dict(type='SyncBN', requires_grad=True)
+b0_cfg = dict(
+    type='EncoderDecoder',
+    pretrained='pretrained/mit_b0.pth',
+    backbone=dict(type='mit_b0', style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[32, 64, 160, 256],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=256),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)))
+b1_cfg = dict(
+    type='EncoderDecoder',
+    pretrained='pretrained/mit_b1.pth',
+    backbone=dict(type='mit_b1', style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[64, 128, 320, 512],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=256),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)))
+b2_cfg = dict(
+    type='EncoderDecoder',
+    pretrained='pretrained/mit_b2.pth',
+    backbone=dict(type='mit_b2', style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[64, 128, 320, 512],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=768),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)))
+b3_cfg = dict(
+    type='EncoderDecoder',
+    pretrained='pretrained/mit_b3.pth',
+    backbone=dict(type='mit_b3', style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[64, 128, 320, 512],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=768),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)))
+b4_cfg = dict(
+    type='EncoderDecoder',
+    pretrained='pretrained/mit_b4.pth',
+    backbone=dict(type='mit_b4', style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[64, 128, 320, 512],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=768),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)))
+t_num = '4'
+s_num = '0'
+cfg_t = dict(
+    type='EncoderDecoder',
+    pretrained='pretrained/mit_b4.pth',
+    backbone=dict(type='mit_b4', style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[64, 128, 320, 512],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=768),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)))
+cfg_s = dict(
+    type='EncoderDecoder',
+    pretrained='pretrained/mit_b0.pth',
+    backbone=dict(type='mit_b0', style='pytorch'),
+    decode_head=dict(
+        type='SegFormerHead',
+        in_channels=[32, 64, 160, 256],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=150,
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=256),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)))
+c = 10
+es = 140
 model = dict(
     type='SDModule',
     cfg_s=dict(
@@ -172,7 +295,8 @@ model = dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))),
     cfg_t=dict(
         type='EncoderDecoder',
-        backbone=dict(type='mit_b3', style='pytorch'),
+        pretrained='pretrained/mit_b4.pth',
+        backbone=dict(type='mit_b4', style='pytorch'),
         decode_head=dict(
             type='SegFormerHead',
             in_channels=[64, 128, 320, 512],
@@ -188,60 +312,22 @@ model = dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))),
     distillation=[
         dict(
-            student_layer='backbone.block4.1.mlp.fc2',
-            teacher_layer='backbone.block4.2.mlp.fc2',
-            loss_name='KLDLoss',
-            loss_config=dict(
-                weight=1,
-                tau=1,
-                reshape_config='feature',
-                resize_config=False,
-                mask_config=False,
-                transform_config=dict(loss_type='channel', group_size=16),
-                ff_config=dict(in_channels=256, out_channels=512),
-                earlystop_config=112000)),
-        dict(
-            student_layer=[
-                'backbone.block4.1.attn.ATTN', 'backbone.block4.1.attn.V'
-            ],
-            teacher_layer=[
-                'backbone.block4.2.attn.ATTN', 'backbone.block4.2.attn.V'
-            ],
-            loss_name='StudentRE',
-            loss_config=dict(
-                weight=0.5,
-                tau=1,
-                transform_config=dict(loss_type='channel', group_size=16),
-                earlystop_config=112000)),
-        dict(
-            student_layer=[
-                'backbone.block4.1.attn.ATTN', 'backbone.block4.1.attn.V'
-            ],
-            teacher_layer=[
-                'backbone.block4.2.attn.ATTN', 'backbone.block4.2.attn.V'
-            ],
-            loss_name='TeacherRE',
-            loss_config=dict(
-                weight=0.5,
-                tau=1,
-                transform_config=dict(loss_type='channel', group_size=16),
-                earlystop_config=112000)),
-        dict(
             student_layer='decode_head.linear_pred',
             teacher_layer='decode_head.linear_pred',
             loss_name='KLDLoss',
             loss_config=dict(
-                weight=2,
+                weight=1,
                 tau=1,
                 reshape_config='logits',
                 resize_config=dict(mode='bilinear', align_corners=False),
                 mask_config=False,
                 transform_config=dict(loss_type='channel', group_size=10),
                 ff_config=False,
-                earlystop_config=112000))
+                shift_config=True,
+                earlystop_config=140000))
     ],
-    t_pretrain='./pretrained/segformer.b3.512x512.ade.160k.pth',
+    t_pretrain='./pretrained/segformer.b4.512x512.ade.160k.pth',
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
-work_dir = './work_drs'
+work_dir = './work_dirs_es_140'
 gpu_ids = range(0, 1)

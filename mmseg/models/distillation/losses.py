@@ -125,15 +125,19 @@ class KLDLoss(nn.Module):
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
         if self.warmup_config:
             if step < self.warmup_config:
-                self.weight = 0
+                self.weight = step/self.warmup_config*self.weight_
             else:
                 self.weight = self.weight_
         if self.earlystop_config:
-            if step > self.earlystop_config:
+            if step > self.earlystop_config and step < self.earlystop_config+10000:
+                self.weight = (self.earlystop_config+10000-step)/10000*self.weight_
+            elif step > self.earlystop_config+9999:
                 self.weight = 0
+            else:
+                self.weight = self.weight_
 
         if self.edt:
-            self.weight = self.weight_*(0.1)**(step/160000)
+            self.weight = self.weight_*(0.01)**(step/160000)
 
         x_student,x_teacher = self._reshape(x_student),self._reshape(x_teacher)
         if self.ff :
@@ -631,7 +635,7 @@ class IFVD(nn.Module):
     def __init__(self, classes=150,**kwargs):
         super().__init__()
         self.num_classes = classes
-
+        self.mse = nn.MSELoss(reduce='mean')
     def forward(self, preds_S, preds_T, target,step):
         feat_S = preds_S
         feat_T = preds_T
@@ -653,20 +657,19 @@ class IFVD(nn.Module):
         pcsim_feat_T = cos(feat_T, center_feat_T)
 
         # mseloss
-        mse = nn.MSELoss()
-        loss = mse(pcsim_feat_S, pcsim_feat_T)
+        
+        loss = 100*self.mse(pcsim_feat_S, pcsim_feat_T)
         return loss
 
 
 class AT(nn.Module):
     def __init__(self):
         super().__init__()
+        self.mse = nn.MSELoss(reduce='mean')
     def forward(self,x_student, x_teacher, gt,step):
-        x_student = x_student.sum(dim=1)
-        x_teacher = x_teacher.sum(dim=1)
-
-        mse = nn.MSELoss()
-        loss = mse(x_student, x_student)
+        x_student = x_student.mean(dim=1)
+        x_teacher = x_teacher.mean(dim=1)
+        loss = 0.1*self.mse(x_student, x_teacher)
         return loss
 
     
