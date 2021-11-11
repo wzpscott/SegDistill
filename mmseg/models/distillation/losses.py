@@ -123,6 +123,7 @@ class KLDLoss(nn.Module):
         return x
 
     def forward(self,x_student,x_teacher,gt_semantic_seg,step):
+        
         if self.warmup_config:
             if step < self.warmup_config:
                 self.weight = step/self.warmup_config*self.weight_
@@ -143,6 +144,7 @@ class KLDLoss(nn.Module):
             x_student = self._ff(x_student)
         if self.resize_config:
             x_student,x_teacher = self._resize(x_student,gt_semantic_seg),self._resize(x_teacher,gt_semantic_seg)
+            # print(x_student.shape,x_teacher.shape)
         if self.mask_config:
             mask = self._mask(x_student,x_teacher,gt_semantic_seg)
         if self.shift_config:
@@ -158,8 +160,9 @@ class KLDLoss(nn.Module):
                 mask = torch.zeros_like(x_student).cuda()
         x_student = F.log_softmax(x_student/self.tau,dim=-1)
         x_teacher = F.softmax(x_teacher/self.tau,dim=-1)
-
+        
         loss = self.KLDiv(x_student,x_teacher)*(1-mask.float())
+        # print(self.weight)
         loss = self.weight*loss.sum()/(x_student.numel()/x_student.shape[-1])
         return loss
 
@@ -635,9 +638,19 @@ class IFVD(nn.Module):
         super().__init__()
         self.num_classes = classes
         self.mse = nn.MSELoss(reduce='mean')
+
+    def _resize(self,x,x_t):
+        x = F.interpolate(
+            input=x,
+            size=x_t.shape[2:],
+            mode='bilinear',align_corners=False)
+        return x
+
     def forward(self, preds_S, preds_T, target,step):
+        # print(preds_S.shape, preds_T.shape)
         feat_S = preds_S
         feat_T = preds_T
+        feat_S = self._resize(feat_S,feat_T)
         feat_T.detach()
         size_f = (feat_S.shape[2], feat_S.shape[3])
         tar_feat_S = nn.Upsample(size_f, mode='nearest')(target.float()).expand(feat_S.size())
@@ -665,7 +678,15 @@ class AT(nn.Module):
     def __init__(self):
         super().__init__()
         self.mse = nn.MSELoss(reduce='mean')
+
+    def _resize(self,x,x_t):
+        x = F.interpolate(
+            input=x,
+            size=x_t.shape[2:],
+            mode='bilinear',align_corners=False)
+        return x
     def forward(self,x_student, x_teacher, gt,step):
+        x_student = self._resize(x_student,x_teacher)
         x_student = x_student.mean(dim=1)
         x_teacher = x_teacher.mean(dim=1)
         loss = 0.1*self.mse(x_student, x_teacher)

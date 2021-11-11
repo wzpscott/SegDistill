@@ -103,9 +103,9 @@ b4_cfg = dict(
         decoder_params=dict(embed_dim=768),
         loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
 )
-psp_config = dict(
+psp_cfg = dict(
         type='EncoderDecoder',
-        pretrained='pretrained/resnet50_v1c-2cccc1ad.pth',
+        # pretrained='pretrained/resnet50_v1c-2cccc1ad.pth',
         backbone=dict(
         type='ResNetV1c',
         depth=50,
@@ -143,7 +143,7 @@ model = dict(
     cfg_s=cfg_s,
     cfg_t=cfg_t,
     distillation = [
-        {'student_layer':'decode_head.linear_pred',
+        {'student_layer':'decode_head.conv_seg',
         'teacher_layer':'decode_head.linear_pred',
         'loss_name':'KLDLoss',
         'loss_config':{
