@@ -111,9 +111,10 @@ class KLDLoss(nn.Module):
             if C%group_size == 0:
                 x = x.reshape(B,C//group_size,-1)
             else:
-                x_ = x[:,0,:,:].clone().reshape(B,1,W,H)
-                x = torch.cat([x,x_],dim=1)
-                x = x.reshape(B,C//group_size+1,-1)
+                n = group_size - C % group_size
+                x_pad =-1e9 * torch.ones(B,n,W,H).cuda()
+                x = torch.cat([x,x_pad],dim=1)
+                x = x.reshape(B,(C+n)//group_size,-1)
         elif loss_type == 'spatial':
             kernel_size = self.transform_config['kernel_size']
             stride = self.transform_config['stride']
@@ -580,7 +581,7 @@ class MTRandomLoss(KLDLoss):
         return loss
 
 class MSE(nn.Module):
-    def __init__(self,weight,tau,\
+    def __init__(self,weight,\
         reshape_config=None,resize_config=None,mask_config=None,transform_config=None,ff_config=None,\
         earlystop_config=None,shift_config=None,warmup_config=0):
         super().__init__()
@@ -592,9 +593,10 @@ class MSE(nn.Module):
         if self.earlystop_config:
             if step > self.earlystop_config:
                 self.weight = 0
-        x_student = x_student.transpose(1,2)
-        x_student = self.ff(x_student)
-        x_student = x_student.transpose(1,2)
+        if self.ff:
+            x_student = x_student.transpose(1,2)
+            x_student = self.ff(x_student)
+            x_student = x_student.transpose(1,2)
         loss = self.weight*torch.mean((x_student-x_teacher)**2)
         return loss
 

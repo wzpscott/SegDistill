@@ -129,7 +129,7 @@ model = dict(
             'ff_config':False,
             'shift_config':True,
             'warmup_config':2000,
-            'earlystop_config':140000,
+            'earlystop_config':120000,
             },
         },
     ],

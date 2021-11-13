@@ -33,7 +33,7 @@ class SDModule(BaseSegmentor):
         self.teacher = builder.build_segmentor(
                     cfg_t, train_cfg=train_cfg, test_cfg=test_cfg)
         self.teacher.load_state_dict(torch.load(
-                t_pretrain)['state_dict'],strict=True)
+                t_pretrain)['state_dict'],strict=False)
         self.teacher.eval()
 
         if len(distillation)>0:
