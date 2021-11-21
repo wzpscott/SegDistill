@@ -17,8 +17,8 @@ pip install IPython
 pip install attr
 pip install timm
 
-git clone https://github.com/wzpscott/SegformerDistillation.git -b new
-cd SegformerDistillation
+git clone https://github.com/wzpscott/SegDistill.git -b main
+cd SegDistill
 pip install -e .
 ```
 
