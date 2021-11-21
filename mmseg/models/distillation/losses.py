@@ -186,13 +186,13 @@ class ATLoss(nn.Module):
         return x
 
     def forward(self,x_student, x_teacher, gt,step):
-        x_student = self._resize(x_student,x_teacher)
+        # x_student = self._resize(x_student,x_teacher)
         loss_AT = self.mse(x_student.mean(dim=1), x_teacher.mean(dim=1))
 
         x_student = F.log_softmax(x_student,dim=1)
         x_teacher = F.softmax(x_teacher,dim=1)
 
-        loss_PD = self.KLD(x_student, x_teacher)/(x_student.numel()/x_student.shape[-1])
+        loss_PD = self.KLD(x_student, x_teacher)/(x_student.numel()/x_student.shape[1])
         loss = loss_AT + loss_PD
         return loss
 
@@ -210,13 +210,13 @@ class IFVDLoss(nn.Module):
     def forward(self, preds_S, preds_T, target,step):
         feat_S = preds_S
         feat_T = preds_T
-        feat_S = self.resize(feat_S,feat_T)
+        feat_T = self.resize(feat_T,feat_S)
         feat_T.detach()
 
         C = feat_T.shape[1]
         x_student = F.log_softmax(feat_S,dim=1)
         x_teacher = F.softmax(feat_T,dim=1)
-        loss_PD = self.KLD(x_student, x_teacher)/(x_student.numel()/x_student.shape[-1])
+        loss_PD = self.KLD(x_student, x_teacher)/(x_student.numel()/x_student.shape[1])
 
         size_f = (feat_S.shape[2], feat_S.shape[3])
         tar_feat_S = nn.Upsample(size_f, mode='nearest')(target.float()).expand(feat_S.size())
