@@ -1,111 +1,59 @@
-[![NVIDIA Source Code License](https://img.shields.io/badge/license-NSCL-blue.svg)](https://github.com/NVlabs/SegFormer/blob/master/LICENSE)
-![Python 3.8](https://img.shields.io/badge/python-3.8-green.svg)
+# SegDistill: Distillation for Semantic Segmentation Transformer Network
 
-# SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers
-
-<!-- ![image](resources/image.png) -->
-<div align="center">
-  <img src="./resources/image.png" height="400">
-</div>
-<p align="center">
-  Figure 1: Performance of SegFormer-B0 to SegFormer-B5.
-</p>
-
-### [Project page](https://github.com/NVlabs/SegFormer) | [Paper](https://arxiv.org/abs/2105.15203) | [Demo (Youtube)](https://www.youtube.com/watch?v=J0MoRQzZe8U) | [Demo (Bilibili)](https://www.bilibili.com/video/BV1MV41147Ko/)
-
-SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers.<br>
-[Enze Xie](https://xieenze.github.io/), [Wenhai Wang](https://whai362.github.io/), [Zhiding Yu](https://chrisding.github.io/), [Anima Anandkumar](http://tensorlab.cms.caltech.edu/users/anima/), [Jose M. Alvarez](https://rsu.data61.csiro.au/people/jalvarez/), and [Ping Luo](http://luoping.me/).<br>
-Technical Report 2021.
-
-This repository contains the official Pytorch implementation of training & evaluation code and the pretrained models for [SegFormer](https://arxiv.org/abs/2105.15203).
-
-SegFormer is a simple, efficient and powerful semantic segmentation method, as shown in Figure 1.
-
-We use [MMSegmentation v0.13.0](https://github.com/open-mmlab/mmsegmentation/tree/v0.13.0) as the codebase.
-
-🔥🔥 SegFormer is on [MMSegmentation](https://github.com/open-mmlab/mmsegmentation/tree/master/configs/segformer). 🔥🔥 
-
+This repo contains the supported code and configuration files for SegDistill .It is based on [mmsegmentaion](https://github.com/open-mmlab/mmsegmentation/tree/v0.11.0).
 
 ## Installation
 
-For install and data preparation, please refer to the guidelines in [MMSegmentation v0.13.0](https://github.com/open-mmlab/mmsegmentation/tree/v0.13.0).
+```bash
+conda create -n mmcv python=3.8 -y
+conda activate mmcv
 
-Other requirements:
-```pip install timm==0.3.2```
+pip install torch==1.7.1+cu110 torchvision==0.8.2+cu110 torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
 
-An example (works for me): ```CUDA 10.1``` and  ```pytorch 1.7.1``` 
+pip install mmcv-full==1.2.2 -f https://download.openmmlab.com/mmcv/dist/cu110/torch1.7.0/index.html
 
-```
-pip install torchvision==0.8.2
-pip install timm==0.3.2
-pip install mmcv-full==1.2.7
-pip install opencv-python==4.5.1.48
-cd SegFormer && pip install -e . --user
-```
+pip install future tensorboard
+pip install IPython
+pip install attr
+pip install timm
 
-## Evaluation
-
-Download [trained weights](https://drive.google.com/drive/folders/1GAku0G0iR9DsBxCbfENWMJ27c5lYUeQA?usp=sharing).
-
-Example: evaluate ```SegFormer-B1``` on ```ADE20K```:
-
-```
-# Single-gpu testing
-python tools/test.py local_configs/segformer/B1/segformer.b1.512x512.ade.160k.py /path/to/checkpoint_file
-
-# Multi-gpu testing
-./tools/dist_test.sh local_configs/segformer/B1/segformer.b1.512x512.ade.160k.py /path/to/checkpoint_file <GPU_NUM>
-
-# Multi-gpu, multi-scale testing
-tools/dist_test.sh local_configs/segformer/B1/segformer.b1.512x512.ade.160k.py /path/to/checkpoint_file <GPU_NUM> --aug-test
+git clone https://github.com/wzpscott/SegformerDistillation.git -b new
+cd SegformerDistillation
+pip install -e .
 ```
 
-## Training
+## Prepare Data
 
-Download [weights](https://drive.google.com/drive/folders/1b7bwrInTW4VLEm27YawHOAMSMikga2Ia?usp=sharing) pretrained on ImageNet-1K, and put them in a folder ```pretrained/```.
-
-Example: train ```SegFormer-B1``` on ```ADE20K```:
+We conducted experiments on ADE20k dataset. The training and validation set of ADE20K could be download from this [link](http://data.csail.mit.edu/places/ADEchallenge/ADEChallengeData2016.zip). Test set can be download from [here](http://data.csail.mit.edu/places/ADEchallenge/release_test.zip). After downloading the dataset, you need to arrange the structure of your dataset like:
 
 ```
-# Single-gpu training
-python tools/train.py local_configs/segformer/B1/segformer.b1.512x512.ade.160k.py 
-
-# Multi-gpu training
-./tools/dist_train.sh local_configs/segformer/B1/segformer.b1.512x512.ade.160k.py <GPU_NUM>
+mmsegmentation
+├── mmseg
+├── tools
+├── configs
+├── data
+│   ├── ade
+│   │   ├── ADEChallengeData2016
+│   │   │   ├── annotations
+│   │   │   │   ├── training
+│   │   │   │   ├── validation
+│   │   │   ├── images
+│   │   │   │   ├── training
+│   │   │   │   ├── validation
+│   ├── ...
 ```
 
-## Visualize
+See [here](https://mmsegmentation.readthedocs.io/en/latest/dataset_prepare.html) for more instructions on data preparation.
 
-Here is a demo script to test a single image. More details refer to [MMSegmentation's Doc](https://mmsegmentation.readthedocs.io/en/latest/get_started.html).
+## Prepare Models
 
-```shell
-python demo/image_demo.py ${IMAGE_FILE} ${CONFIG_FILE} ${CHECKPOINT_FILE} [--device ${DEVICE_NAME}] [--palette-thr ${PALETTE}]
-```
+We provide links to pretrained weights of models used in the paper.
 
-Example: visualize ```SegFormer-B1``` on ```CityScapes```: 
+| Model            | Pretrained on ImageNet-1K                                    | Trained on ADE20k                                            |
+| ---------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Segformer        | [link](https://drive.google.com/drive/folders/1b7bwrInTW4VLEm27YawHOAMSMikga2Ia) | [link](https://drive.google.com/drive/folders/1GAku0G0iR9DsBxCbfENWMJ27c5lYUeQA) |
+| Swin-Transformer | [link](https://github.com/SwinTransformer/storage/releases/download/v1.0.1/upernet_swin_base_patch4_window7_512x512.pth) | [link](https://github.com/SwinTransformer/storage/releases/download/v1.0.1/upernet_swin_base_patch4_window7_512x512.pth) |
+| PSPNet           | [link](https://download.openmmlab.com/mmsegmentation/v0.5/pspnet/pspnet_r101-d8_512x512_80k_ade20k) | [link](https://download.openmmlab.com/mmsegmentation/v0.5/pspnet/pspnet_r101-d8_512x512_80k_ade20k/pspnet_r101-d8_512x512_80k_ade20k_20200614_031423-b6e782f0.pth) |
 
-```shell
-python demo/image_demo.py demo/demo.png local_configs/segformer/B1/segformer.b1.512x512.ade.160k.py \
-/path/to/checkpoint_file --device cuda:0 --palette cityscapes
-```
+## Channel Group Distillation
 
-
-
-
-
-## License
-Please check the LICENSE file. SegFormer may be used non-commercially, meaning for research or 
-evaluation purposes only. For business inquiries, please contact 
-[researchinquiries@nvidia.com](mailto:researchinquiries@nvidia.com).
-
-
-## Citation
-```
-@article{xie2021segformer,
-  title={SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers},
-  author={Xie, Enze and Wang, Wenhai and Yu, Zhiding and Anandkumar, Anima and Alvarez, Jose M and Luo, Ping},
-  journal={arXiv preprint arXiv:2105.15203},
-  year={2021}
-}
-```
-# SegformerDistillation

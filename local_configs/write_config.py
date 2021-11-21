@@ -13,3 +13,4 @@ with open(f'/home/mist/SegformerDistillation/local_configs/{sh_path}','w') as f:
             command = f'bash tools/dist_train.sh {config_path}{c} 8;\n'
             f.write(command)
 print('done')
+

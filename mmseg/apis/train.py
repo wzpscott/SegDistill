@@ -40,21 +40,21 @@ def train_segmentor(model,
 
     logger = get_root_logger(cfg.log_level)
 
-    if cfg.resume_from:
-        try:
-            device_id = torch.cuda.current_device()
-            checkpoint = load_checkpoint(
-                model,
-                cfg.resume_from,
-                map_location=lambda storage, loc: storage.cuda(device_id),
-                strict=False,
-                logger=logger,
-                revise_keys=[(r'^module\.', '')])
+    # if cfg.resume_from:
+    #     try:
+    #         device_id = torch.cuda.current_device()
+    #         checkpoint = load_checkpoint(
+    #             model,
+    #             cfg.resume_from,
+    #             map_location=lambda storage, loc: storage.cuda(device_id),
+    #             strict=False,
+    #             logger=logger,
+    #             revise_keys=[(r'^module\.', '')])
 
-            cnt = checkpoint['meta']['iter']
-            model.my_resume(cnt)
-        except:
-            print('iter not updated')
+    #         cnt = checkpoint['meta']['iter']
+    #         model.my_resume(cnt)
+    #     except:
+    #         print('iter not updated')
 
 
     # prepare data loaders
@@ -133,4 +133,6 @@ def train_segmentor(model,
             print('unsuccessful resume....')
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
+    model.cnt = runner.iter
+    
     runner.run(data_loaders, cfg.workflow)
