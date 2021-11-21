@@ -57,3 +57,16 @@ We provide links to pretrained weights of models used in the paper.
 
 ## Channel Group Distillation
 
+Our Channel Group Distillation (CGD) considers a more extensive range of correlations inthe activation map and works well fortransformer structures than previous KD methods.
+
+Comparison to Other KD methods
+
+![Comparison to Other KD methods](figures/group_illu.png)
+
+Results on ADE20k
+<div  align="center">    
+<img src="figures/Tab5_Results.png" style="zoom:75%;" align=center />
+</div>
+
+Qualitative segmentation results on ADE20k produced from Segformer B0: (a) raw images, (b) ground truth (GT), (c) outputof the original student model (d) Channel-wise Distillation (CD) and (e) Channel Group Distillation(CGD)
+![Qualitative segmentation results](figures/quan_res.png)
