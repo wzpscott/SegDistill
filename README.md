@@ -64,7 +64,7 @@ Run an example config with the following command:
  bash tools/dist_train.sh distillation_configs/example_config.py {num_gpu}
 ```
 
-See [here]() for detailed instructions for custom KD process on various network architectures.
+See [here](https://github.com/wzpscott/SegDistill/blob/main/docs/tutorials/Customize%20KD%20process.md) for detailed instructions for custom KD process on various network architectures.
 
 ## Channel Group Distillation
 
