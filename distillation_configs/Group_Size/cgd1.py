@@ -1,3 +1,4 @@
+
 _base_ = [
     '../_base_/datasets/ade20k_repeat.py',
     '../_base_/default_runtime.py',
@@ -25,7 +26,7 @@ cfg_t = dict(
 )
 cfg_s = dict(
         type='EncoderDecoder',
-        pretrained='pretrained/mit_b0.pth',
+        # pretrained='pretrained/mit_b0.pth',
         backbone=dict(
             type='mit_b0',
             style='pytorch'),
@@ -53,7 +54,7 @@ model = dict(
         'loss_config':{'group_size':1},
         },
     ],
-    t_pretrain = f'./pretrained/segformer.b3.512x512.ade.160k.pth',  # 老师的预训练模型
+    # t_pretrain = f'./pretrained/segformer.b3.512x512.ade.160k.pth',  # 老师的预训练模型
     train_cfg=dict(),
     test_cfg=dict(mode='whole'),
 )
