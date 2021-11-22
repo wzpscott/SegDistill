@@ -1,4 +1,4 @@
-# SegDistill: Distillation for Semantic Segmentation Transformer Network
+# SegDistill: Toolbox for Knowledge Distillation on Semantic Segmentation Networks
 
 This repo contains the supported code and configuration files for SegDistill .It is based on [mmsegmentaion](https://github.com/open-mmlab/mmsegmentation/tree/v0.11.0).
 
